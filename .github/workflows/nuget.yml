@@ -60,6 +60,7 @@ jobs:
             -DBUILD_VRPN=OFF \
             -DBUILD_FCOLLADA=OFF \
             -DBUILD_NVIDIACG=OFF \
+            -DBUILD_FFMPEG=OFF \
             -DBUILD_RECAST=OFF
           cmake --build thirdparty-build --config Release --parallel 8
 
@@ -74,6 +75,7 @@ jobs:
             -DBUILD_ARTOOLKIT=OFF `
             -DBUILD_VRPN=OFF `
             -DBUILD_FCOLLADA=OFF `
+            -DBUILD_FFMPEG=OFF `
             -DBUILD_RECAST=OFF
           cmake --build thirdparty-build --config Release --parallel 8
 
