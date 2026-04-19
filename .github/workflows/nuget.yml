@@ -1,0 +1,291 @@
+name: Build C# Bindings NuGet Package
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version override (e.g. 1.11.1-preview.1). Leave blank to auto-derive.'
+        required: false
+
+# Stage 1 — Build Panda3D native libraries (8 parallel jobs)
+jobs:
+  build-panda3d:
+    name: panda3d / ${{ matrix.rid }} / ${{ matrix.link }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:   [ubuntu-24.04, windows-2022, macos-13, macos-latest]
+        link: [shared, static]
+        include:
+          - { os: ubuntu-24.04, rid: linux-x64,  thirdparty_dir: linux-libs-x64    }
+          - { os: windows-2022, rid: win-x64,    thirdparty_dir: win-libs-vc14-x64 }
+          - { os: macos-13,     rid: osx-x64,    thirdparty_dir: darwin-libs-a     }
+          - { os: macos-latest, rid: osx-arm64,  thirdparty_dir: darwin-libs-a     }
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+
+      # Use the thirdparty build scripts rather than any system packages to
+      # make sure we have a consistent build for our packages.
+      - name: Checkout panda3d-thirdparty
+        uses: actions/checkout@v4
+        with:
+          repository: rdb/panda3d-thirdparty
+          path: thirdparty
+          fetch-depth: 1
+
+      # Cache key is the hash of the thirdparty CMakeLists so we rebuild only
+      # when the thirdparty repo changes.
+      - name: Cache thirdparty
+        id: tp-cache
+        uses: actions/cache@v4
+        with:
+          path: thirdparty/${{ matrix.thirdparty_dir }}
+          key: panda3d-tp-${{ matrix.thirdparty_dir }}-${{ hashFiles('thirdparty/CMakeLists.txt') }}
+
+      - name: Build thirdparty (Linux / macOS)
+        if: steps.tp-cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
+        run: |
+          cmake -B thirdparty-build -S thirdparty \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_OPENCV=OFF \
+            -DBUILD_ARTOOLKIT=OFF \
+            -DBUILD_VRPN=OFF \
+            -DBUILD_FCOLLADA=OFF \
+            -DBUILD_RECAST=OFF
+          cmake --build thirdparty-build --config Release --parallel 8
+
+      - name: Build thirdparty (Windows)
+        if: steps.tp-cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -B thirdparty-build -S thirdparty `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DBUILD_OPENCV=OFF `
+            -DBUILD_ARTOOLKIT=OFF `
+            -DBUILD_VRPN=OFF `
+            -DBUILD_FCOLLADA=OFF `
+            -DBUILD_RECAST=OFF
+          cmake --build thirdparty-build --config Release --parallel 8
+
+      - name: Install build tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build bison flex \
+            libgl1-mesa-dev libegl1-mesa-dev \
+            libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxext-dev \
+            libsm-dev libice-dev
+
+      - name: Install build tools (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja bison flex
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix flex)/bin"  >> "$GITHUB_PATH"
+
+      - name: Install build tools (Windows)
+        if: runner.os == 'Windows'
+        run: choco install winflexbison3 --yes
+
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} \
+            -DINTERROGATE_CSHARP_INTERFACE=ON \
+            -DBUILD_INTERROGATE=ON \
+            -DHAVE_PYTHON=NO \
+            -DBUILD_METALIBS=YES
+
+      - name: Configure (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} \
+            -DINTERROGATE_CSHARP_INTERFACE=ON \
+            -DBUILD_INTERROGATE=ON \
+            -DHAVE_PYTHON=NO \
+            -DBUILD_METALIBS=YES
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -B build `
+            -G "Visual Studio 17 2022" -A x64 `
+            "-DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }}" `
+            -DINTERROGATE_CSHARP_INTERFACE=ON `
+            -DBUILD_INTERROGATE=ON `
+            -DHAVE_PYTHON=NO `
+            -DBUILD_METALIBS=YES
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 8
+
+      # Collect native libraries
+      # For static builds we also bundle thirdparty static archives so NativeAOT
+      # consumers can link without any separately-installed packages.
+      - name: Collect native libs (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir dist
+          # Thirdparty statics (static build only — for shared they are absorbed
+          # into the .so at link time and need not be redistributed)
+          if [ "${{ matrix.link }}" = "static" ]; then
+            find thirdparty/${{ matrix.thirdparty_dir }} -name "*.a" \
+              -exec cp -n {} dist/ \; 2>/dev/null || true
+          fi
+          # Panda3D shared objects
+          find build -maxdepth 4 \( -name "*.so" -o -name "*.so.*" \) \
+            ! -name "*igate*" ! -name "*supplemental*" \
+            -exec cp -n {} dist/ \; 2>/dev/null || true
+          # Panda3D static archives
+          find build -maxdepth 4 -name "*.a" \
+            ! -name "*igate*" \
+            -exec cp -n {} dist/ \; 2>/dev/null || true
+          echo "--- collected ---" && ls -la dist/
+
+      - name: Collect native libs (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir dist
+          if [ "${{ matrix.link }}" = "static" ]; then
+            find thirdparty/${{ matrix.thirdparty_dir }} -name "*.a" \
+              -exec cp -n {} dist/ \; 2>/dev/null || true
+          fi
+          find build -maxdepth 4 -name "*.dylib" \
+            ! -name "*igate*" ! -name "*supplemental*" \
+            -exec cp -n {} dist/ \; 2>/dev/null || true
+          find build -maxdepth 4 -name "*.a" \
+            ! -name "*igate*" \
+            -exec cp -n {} dist/ \; 2>/dev/null || true
+          echo "--- collected ---" && ls -la dist/
+
+      - name: Collect native libs (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item dist -ItemType Directory -Force
+          if ("${{ matrix.link }}" -eq "static") {
+            Get-ChildItem -Recurse thirdparty\${{ matrix.thirdparty_dir }} -Filter '*.lib' |
+              Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
+          }
+          Get-ChildItem -Recurse build -Filter '*.dll' |
+            Where-Object { $_.Name -notmatch 'igate' } |
+            Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
+          Get-ChildItem -Recurse build -Filter '*.lib' |
+            Where-Object { $_.Name -notmatch 'igate' } |
+            Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
+          Get-ChildItem dist\
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: panda3d-native-${{ matrix.rid }}-${{ matrix.link }}
+          path: dist/
+          if-no-files-found: error
+
+      # Read the Version from Interrogate.Core.csproj and derive major.minor.*
+      # so the packed Panda3D.nupkg requires a compatible Interrogate.Core from NuGet.
+      - name: Extract Interrogate.Core version range
+        if: matrix.rid == 'linux-x64' && matrix.link == 'shared'
+        run: |
+          CSPROJ="build/interrogate/src/panda3d-interrogate/csharp/Interrogate.Core/Interrogate.Core.csproj"
+          VER=$(grep '<Version>' "$CSPROJ" | sed 's|.*<Version>\(.*\)</Version>.*|\1|' | tr -d '[:space:]')
+          MAJOR_MINOR=$(echo "$VER" | cut -d. -f1,2)
+          mkdir igate-ver
+          echo "${MAJOR_MINOR}.*" > igate-ver/igate-core-ver.txt
+          echo "Interrogate.Core version range: ${MAJOR_MINOR}.*"
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.rid == 'linux-x64' && matrix.link == 'shared'
+        with:
+          name: interrogate-core-version
+          path: igate-ver/igate-core-ver.txt
+          if-no-files-found: error
+
+      - name: Upload C# sources
+        if: matrix.rid == 'linux-x64' && matrix.link == 'shared'
+        uses: actions/upload-artifact@v4
+        with:
+          name: panda3d-csharp-sources
+          path: build/csharp/
+          if-no-files-found: error
+
+# Stage 2 — Assemble the NuGet package from all the artifacts we just made
+  pack-nuget:
+    name: Pack NuGet Package
+    runs-on: ubuntu-24.04
+    needs: build-panda3d
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history needed to count commits since v1.10.0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: 'panda3d-*'
+          path: artifacts/
+          merge-multiple: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: interrogate-core-version
+          path: artifacts/interrogate-core-version/
+
+      # Build the runtimes/ tree expected by Panda3D.csproj
+      - name: Assemble runtimes directory
+        run: |
+          for rid in linux-x64 win-x64 osx-x64 osx-arm64; do
+            mkdir -p "runtimes/$rid/native"
+            for link in shared static; do
+              src="artifacts/panda3d-native-${rid}-${link}"
+              [ -d "$src" ] && cp "$src"/* "runtimes/$rid/native/" 2>/dev/null || true
+            done
+          done
+          echo "=== runtimes layout ==="
+          find runtimes -type f | sort
+
+      - name: Resolve version
+        id: ver
+        run: |
+          V="${{ inputs.version }}"
+          if [ -z "$V" ]; then
+            COMMITS=$(git rev-list --count v1.10.0..HEAD)
+            V="1.11.0-preview.${COMMITS}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Pack Panda3D
+        run: |
+          IGATE_VER_RANGE=$(cat artifacts/interrogate-core-version/igate-core-ver.txt)
+          dotnet pack csharp/Panda3D.csproj \
+            -c Release \
+            -p:Version="${{ steps.ver.outputs.version }}" \
+            -p:GeneratedSourcesDir="${{ github.workspace }}/artifacts/panda3d-csharp-sources" \
+            -p:RuntimesDir="${{ github.workspace }}/runtimes" \
+            -p:InterrogateCoreVersion="$IGATE_VER_RANGE" \
+            -o nupkg/
+
+      - name: List package contents
+        run: unzip -l nupkg/*.nupkg | grep -E 'runtimes|Generated|\.cs|\.so|\.dll|\.dylib|\.a|\.lib' | sort
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: nupkg/*.nupkg
