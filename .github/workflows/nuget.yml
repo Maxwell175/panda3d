@@ -69,6 +69,7 @@ jobs:
         run: |
           cmake -B thirdparty-build -S thirdparty `
             -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
             -DBUILD_OPENCV=OFF `
             -DBUILD_ARTOOLKIT=OFF `
             -DBUILD_VRPN=OFF `
@@ -129,6 +130,7 @@ jobs:
           cmake -B build `
             -G "Visual Studio 17 2022" -A x64 `
             "-DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }}" `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
             -DINTERROGATE_CSHARP_INTERFACE=ON `
             -DBUILD_INTERROGATE=ON `
             -DHAVE_PYTHON=NO `

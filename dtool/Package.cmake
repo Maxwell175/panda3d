@@ -468,6 +468,14 @@ set(_PREV_WANT_PYTHON_VERSION "${WANT_PYTHON_VERSION}" CACHE INTERNAL "Internal.
 # OpenSSL
 find_package(OpenSSL COMPONENTS SSL Crypto QUIET)
 
+# OpenSSL's cmake config (and CMake's own FindOpenSSL) do not declare the
+# Windows system library deps needed when linking against static libcrypto.lib.
+# Inject them here so every consumer of OpenSSL::Crypto gets them automatically.
+if(WIN32 AND TARGET OpenSSL::Crypto)
+  set_property(TARGET OpenSSL::Crypto APPEND PROPERTY
+    INTERFACE_LINK_LIBRARIES ws2_32 crypt32)
+endif()
+
 package_option(OpenSSL
   DEFAULT ON
   "Enable OpenSSL support"
