@@ -17,13 +17,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:   [ubuntu-24.04, windows-2022, macos-13, macos-latest]
+        os:   [ubuntu-24.04, windows-2022]
         link: [shared, static]
         include:
           - { os: ubuntu-24.04, rid: linux-x64,  thirdparty_dir: linux-libs-x64    }
           - { os: windows-2022, rid: win-x64,    thirdparty_dir: win-libs-vc14-x64 }
-          - { os: macos-13,     rid: osx-x64,    thirdparty_dir: darwin-libs-a     }
-          - { os: macos-latest, rid: osx-arm64,  thirdparty_dir: darwin-libs-a     }
+          - { os: macos-latest, link: shared, rid: osx-x64,   thirdparty_dir: darwin-libs-a, cmake_osx_arch: x86_64 }
+          - { os: macos-latest, link: static, rid: osx-x64,   thirdparty_dir: darwin-libs-a, cmake_osx_arch: x86_64 }
+          - { os: macos-latest, link: shared, rid: osx-arm64, thirdparty_dir: darwin-libs-a, cmake_osx_arch: arm64  }
+          - { os: macos-latest, link: static, rid: osx-arm64, thirdparty_dir: darwin-libs-a, cmake_osx_arch: arm64  }
 
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +59,7 @@ jobs:
             -DBUILD_ARTOOLKIT=OFF \
             -DBUILD_VRPN=OFF \
             -DBUILD_FCOLLADA=OFF \
+            -DBUILD_NVIDIACG=OFF \
             -DBUILD_RECAST=OFF
           cmake --build thirdparty-build --config Release --parallel 8
 
@@ -112,6 +115,7 @@ jobs:
           cmake -B build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_osx_arch }} \
             -DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} \
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
