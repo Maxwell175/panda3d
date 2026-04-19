@@ -730,8 +730,8 @@ package_status(HarfBuzz "HarfBuzz")
 # HarfBuzz in panda3d-thirdparty is built with FreeType support but its cmake
 # config does not declare freetype as a transitive dep, so static
 # libharfbuzz.a consumers get unresolved FT_* references.  Inject it here.
-if(TARGET harfbuzz::harfbuzz AND HAVE_FREETYPE)
-  set_property(TARGET harfbuzz::harfbuzz APPEND PROPERTY
+if(HAVE_HARFBUZZ AND HAVE_FREETYPE)
+  set_property(TARGET PKG::HARFBUZZ APPEND PROPERTY
     INTERFACE_LINK_LIBRARIES PKG::FREETYPE)
 endif()
 

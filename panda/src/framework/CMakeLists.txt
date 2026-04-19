@@ -13,17 +13,25 @@ set(P3FRAMEWORK_SOURCES
 
 set(P3FRAMEWORK_LINK_TARGETS panda)
 if(NOT BUILD_SHARED_LIBS)
-  # If we're statically linking, we need to explicitly link with
-  # at least one of the available renderers.
+  # In static builds, link all available renderers so their init symbols are
+  # reachable and graphicsPipeSelection can register each pipe type.
+  set(_any_renderer OFF)
   if(HAVE_GL)
     list(APPEND P3FRAMEWORK_LINK_TARGETS pandagl)
-  elseif(HAVE_DX9)
+    set(_any_renderer ON)
+  endif()
+  if(HAVE_DX9)
     list(APPEND P3FRAMEWORK_LINK_TARGETS pandadx9)
-  elseif(HAVE_TINYDISPLAY)
+    set(_any_renderer ON)
+  endif()
+  if(HAVE_TINYDISPLAY)
     list(APPEND P3FRAMEWORK_LINK_TARGETS p3tinydisplay)
-  else()
+    set(_any_renderer ON)
+  endif()
+  if(NOT _any_renderer)
     message(WARNING "No renderer library available to link to p3framework.")
   endif()
+  unset(_any_renderer)
 
   # And we might like to have the p3egg loader available.
   if(HAVE_EGG)
