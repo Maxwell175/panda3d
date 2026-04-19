@@ -8,11 +8,74 @@ on:
         description: 'Package version override (e.g. 1.11.1-preview.1). Leave blank to auto-derive.'
         required: false
 
-# Stage 1 — Build Panda3D native libraries (8 parallel jobs)
 jobs:
+  thirdparty:
+    name: Build Thirdparty
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-24.04, windows-2022, macOS-15 ]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Restore thirdparty build cache
+        id: cache-thirdparty-restore
+        uses: actions/cache/restore@v5
+        with:
+          path: ./thirdparty
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.os }}
+
+      - name: Install yasm
+        if: runner.os != 'Windows' && steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
+        run: ${{runner.os == 'macOS' && 'brew' || 'sudo apt-get'}} install yasm
+
+      - name: Clone thirdparty repository
+        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
+        run: git clone --revision=73384217d26c56aa9594e6d77c9b7c54f9c0d689 --depth=1 https://github.com/rdb/panda3d-thirdparty.git thirdparty
+
+      - name: Configure
+        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
+        working-directory: thirdparty
+        run: >
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_NVIDIACG=OFF
+          -DBUILD_FFMPEG=OFF
+          -DBUILD_FCOLLADA=OFF
+          -DBUILD_OPENSSL=OFF
+          -DBUILD_ARTOOLKIT=OFF
+
+      - name: Build
+        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
+        working-directory: thirdparty
+        run: cmake --build build --config Release -j4
+
+      - name: Clean up build directory
+        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
+        working-directory: thirdparty
+        shell: bash
+        run: rm -rf build
+
+      - name: Save thirdparty build cache
+        id: cache-thirdparty-save
+        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ./thirdparty
+          key: ${{ steps.cache-thirdparty-restore.outputs.cache-primary-key }}
+
+      - name: List thirdparty contents
+        working-directory: thirdparty
+        shell: bash
+        run: ls -lAhR
+
+  # Stage 1 — Build Panda3D native libraries (8 parallel jobs)
   build-panda3d:
     name: panda3d / ${{ matrix.rid }} / ${{ matrix.link }}
     runs-on: ${{ matrix.os }}
+    needs: thirdparty
 
     strategy:
       fail-fast: false
@@ -22,69 +85,30 @@ jobs:
         include:
           - { os: ubuntu-24.04, rid: linux-x64,  thirdparty_dir: linux-libs-x64    }
           - { os: windows-2022, rid: win-x64,    thirdparty_dir: win-libs-vc14-x64 }
-          - { os: macos-latest, link: shared, rid: osx-x64,   thirdparty_dir: darwin-libs-a, cmake_osx_arch: x86_64 }
-          - { os: macos-latest, link: static, rid: osx-x64,   thirdparty_dir: darwin-libs-a, cmake_osx_arch: x86_64 }
-          - { os: macos-latest, link: shared, rid: osx-arm64, thirdparty_dir: darwin-libs-a, cmake_osx_arch: arm64  }
-          - { os: macos-latest, link: static, rid: osx-arm64, thirdparty_dir: darwin-libs-a, cmake_osx_arch: arm64  }
+          - { os: macOS-15, link: shared, rid: osx-x64,   thirdparty_dir: darwin-libs-a, cmake_osx_arch: x86_64 }
+          - { os: macOS-15, link: static, rid: osx-x64,   thirdparty_dir: darwin-libs-a, cmake_osx_arch: x86_64 }
+          - { os: macOS-15, link: shared, rid: osx-arm64, thirdparty_dir: darwin-libs-a, cmake_osx_arch: arm64  }
+          - { os: macOS-15, link: static, rid: osx-arm64, thirdparty_dir: darwin-libs-a, cmake_osx_arch: arm64  }
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 10
 
-      # Use the thirdparty build scripts rather than any system packages to
-      # make sure we have a consistent build for our packages.
-      - name: Checkout panda3d-thirdparty
-        uses: actions/checkout@v4
+      - name: Restore thirdparty build cache
+        id: cache-thirdparty-restore
+        uses: actions/cache/restore@v5
         with:
-          repository: rdb/panda3d-thirdparty
-          path: thirdparty
-          fetch-depth: 1
-
-      # Cache key is the hash of the thirdparty CMakeLists so we rebuild only
-      # when the thirdparty repo changes.
-      - name: Cache thirdparty
-        id: tp-cache
-        uses: actions/cache@v4
-        with:
-          path: thirdparty/${{ matrix.thirdparty_dir }}
-          key: panda3d-tp-${{ matrix.thirdparty_dir }}-${{ hashFiles('thirdparty/CMakeLists.txt') }}
-
-      - name: Build thirdparty (Linux / macOS)
-        if: steps.tp-cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
-        run: |
-          cmake -B thirdparty-build -S thirdparty \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_OPENCV=OFF \
-            -DBUILD_ARTOOLKIT=OFF \
-            -DBUILD_VRPN=OFF \
-            -DBUILD_FCOLLADA=OFF \
-            -DBUILD_NVIDIACG=OFF \
-            -DBUILD_FFMPEG=OFF \
-            -DBUILD_RECAST=OFF
-          cmake --build thirdparty-build --config Release --parallel 8
-
-      - name: Build thirdparty (Windows)
-        if: steps.tp-cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          cmake -B thirdparty-build -S thirdparty `
-            -G "Visual Studio 17 2022" -A x64 `
-            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
-            -DBUILD_OPENCV=OFF `
-            -DBUILD_ARTOOLKIT=OFF `
-            -DBUILD_VRPN=OFF `
-            -DBUILD_FCOLLADA=OFF `
-            -DBUILD_FFMPEG=OFF `
-            -DBUILD_RECAST=OFF
-          cmake --build thirdparty-build --config Release --parallel 8
+          path: ./thirdparty
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.os }}
+          fail-on-cache-miss: true
 
       - name: Install build tools (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            ninja-build bison flex nasm \
+            ninja-build bison flex \
             libgl1-mesa-dev libegl1-mesa-dev \
             libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxext-dev \
             libsm-dev libice-dev
@@ -110,8 +134,7 @@ jobs:
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
             -DHAVE_PYTHON=NO \
-            -DBUILD_METALIBS=YES \
-            -DHAVE_TINYDISPLAY=OFF
+            -DBUILD_METALIBS=YES
 
       - name: Configure (macOS)
         if: runner.os == 'macOS'
@@ -124,8 +147,7 @@ jobs:
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
             -DHAVE_PYTHON=NO \
-            -DBUILD_METALIBS=YES \
-            -DHAVE_TINYDISPLAY=OFF
+            -DBUILD_METALIBS=YES
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
@@ -134,7 +156,6 @@ jobs:
           cmake -B build `
             -G "Visual Studio 17 2022" -A x64 `
             "-DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }}" `
-            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
             -DHAVE_MIMALLOC=OFF `
             -DINTERROGATE_CSHARP_INTERFACE=ON `
             -DBUILD_INTERROGATE=ON `
@@ -144,24 +165,20 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel 8
 
-      # Collect native libraries
+      # Collect native libraries.
       # For static builds we also bundle thirdparty static archives so NativeAOT
       # consumers can link without any separately-installed packages.
       - name: Collect native libs (Linux)
         if: runner.os == 'Linux'
         run: |
           mkdir dist
-          # Thirdparty statics (static build only — for shared they are absorbed
-          # into the .so at link time and need not be redistributed)
           if [ "${{ matrix.link }}" = "static" ]; then
             find thirdparty/${{ matrix.thirdparty_dir }} -name "*.a" \
               -exec cp -n {} dist/ \; 2>/dev/null || true
           fi
-          # Panda3D shared objects
           find build -maxdepth 4 \( -name "*.so" -o -name "*.so.*" \) \
             ! -name "*igate*" ! -name "*supplemental*" \
             -exec cp -n {} dist/ \; 2>/dev/null || true
-          # Panda3D static archives
           find build -maxdepth 4 -name "*.a" \
             ! -name "*igate*" \
             -exec cp -n {} dist/ \; 2>/dev/null || true
@@ -233,7 +250,7 @@ jobs:
           path: build/csharp/
           if-no-files-found: error
 
-# Stage 2 — Assemble the NuGet package from all the artifacts we just made
+  # Stage 2 — Assemble the NuGet package from all the artifacts we just made
   pack-nuget:
     name: Pack NuGet Package
     runs-on: ubuntu-24.04
