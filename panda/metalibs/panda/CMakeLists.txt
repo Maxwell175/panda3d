@@ -24,6 +24,30 @@ set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME "CoreDevel")
 add_metalib(panda INIT init_libpanda panda.h COMPONENTS ${PANDA_LINK_TARGETS})
 unset(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME)
 
+if(UNIX AND NOT APPLE AND NOT BUILD_SHARED_LIBS AND HAVE_HARFBUZZ AND HAVE_FREETYPE)
+  set(_hb_file "")
+  set(_ft_file "")
+  if(TARGET harfbuzz::harfbuzz)
+    set(_hb_file "$<TARGET_FILE:harfbuzz::harfbuzz>")
+  elseif(DEFINED HARFBUZZ_LIBRARY)
+    set(_hb_file "${HARFBUZZ_LIBRARY}")
+  endif()
+  if(TARGET freetype)
+    set(_ft_file "$<TARGET_FILE:freetype>")
+  elseif(TARGET Freetype::Freetype)
+    set(_ft_file "$<TARGET_FILE:Freetype::Freetype>")
+  elseif(DEFINED FREETYPE_LIBRARY)
+    set(_ft_file "${FREETYPE_LIBRARY}")
+  endif()
+  if(_hb_file AND _ft_file)
+    set_property(TARGET panda APPEND PROPERTY INTERFACE_LINK_LIBRARIES
+      "-Wl,--start-group" "${_hb_file}" "${_ft_file}" "-Wl,--end-group"
+    )
+  endif()
+  unset(_hb_file)
+  unset(_ft_file)
+endif()
+
 install(TARGETS panda
   EXPORT Core COMPONENT Core
   DESTINATION ${CMAKE_INSTALL_LIBDIR}

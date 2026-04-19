@@ -21,3 +21,11 @@ mark_as_advanced(HARFBUZZ_INCLUDE_DIR HARFBUZZ_LIBRARY)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(HarfBuzz DEFAULT_MSG HARFBUZZ_INCLUDE_DIR HARFBUZZ_LIBRARY)
+
+if(HARFBUZZ_FOUND AND NOT TARGET harfbuzz::harfbuzz)
+  add_library(harfbuzz::harfbuzz UNKNOWN IMPORTED)
+  set_target_properties(harfbuzz::harfbuzz PROPERTIES
+    IMPORTED_LOCATION "${HARFBUZZ_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${HARFBUZZ_INCLUDE_DIR}"
+  )
+endif()
