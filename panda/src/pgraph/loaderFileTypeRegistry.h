@@ -44,10 +44,10 @@ PUBLISHED:
   PY_EXTENSION(void unregister_type(PyObject *type));
 
   int get_num_types() const;
-  LoaderFileType *get_type(int n) const;
+  NULLABLE LoaderFileType *get_type(int n) const;
   MAKE_SEQ(get_types, get_num_types, get_type);
   MAKE_SEQ_PROPERTY(types, get_num_types, get_type);
-  LoaderFileType *get_type_from_extension(const std::string &extension);
+  NULLABLE LoaderFileType *get_type_from_extension(const std::string &extension);
 
   void write(std::ostream &out, int indent_level = 0) const;
 

@@ -38,23 +38,23 @@ class EXPCL_PANDA_GOBJ TexturePool {
 PUBLISHED:
   INLINE static bool has_texture(const Filename &filename);
   INLINE static bool verify_texture(const Filename &filename);
-  INLINE static Texture *get_texture(const Filename &filename,
+  NULLABLE INLINE static Texture *get_texture(const Filename &filename,
                                      int primary_file_num_channels = 0,
                                      bool read_mipmaps = false);
-  INLINE static Texture *get_texture(const Filename &filename,
+  NULLABLE INLINE static Texture *get_texture(const Filename &filename,
                                      const Filename &alpha_filename,
                                      int primary_file_num_channels = 0,
                                      int alpha_file_channel = 0,
                                      bool read_mipmaps = false);
-  BLOCKING INLINE static Texture *load_texture(const Filename &filename,
-                                               int primary_file_num_channels = 0,
-                                               bool read_mipmaps = false,
-                                               const LoaderOptions &options = LoaderOptions(),
-                                               const SamplerState &sampler = SamplerState());
-  BLOCKING INLINE static Texture *load_texture(const Filename &filename,
-                                               const Filename &alpha_filename,
-                                               int primary_file_num_channels = 0,
-                                               int alpha_file_channel = 0,
+  NULLABLE BLOCKING INLINE static Texture *load_texture(const Filename &filename,
+                                                int primary_file_num_channels = 0,
+                                                bool read_mipmaps = false,
+                                                const LoaderOptions &options = LoaderOptions(),
+                                                const SamplerState &sampler = SamplerState());
+  NULLABLE BLOCKING INLINE static Texture *load_texture(const Filename &filename,
+                                                const Filename &alpha_filename,
+                                                int primary_file_num_channels = 0,
+                                                int alpha_file_channel = 0,
                                                bool read_mipmaps = false,
                                                const LoaderOptions &options = LoaderOptions(),
                                                const SamplerState &sampler = SamplerState());

@@ -47,28 +47,28 @@ PUBLISHED:
   virtual bool is_writable() const;
 
   BLOCKING virtual bool delete_file();
-  BLOCKING virtual bool rename_file(VirtualFile *new_file);
-  BLOCKING virtual bool copy_file(VirtualFile *new_file);
+  BLOCKING virtual bool rename_file(NULLABLE VirtualFile *new_file);
+  BLOCKING virtual bool copy_file(NULLABLE VirtualFile *new_file);
 
-  BLOCKING PT(VirtualFileList) scan_directory() const;
+  NULLABLE BLOCKING PT(VirtualFileList) scan_directory() const;
 
   void output(std::ostream &out) const;
   BLOCKING void ls(std::ostream &out = std::cout) const;
   BLOCKING void ls_all(std::ostream &out = std::cout) const;
 
   PY_EXTENSION(PyObject *read_file(bool auto_unwrap) const);
-  BLOCKING virtual std::istream *open_read_file(bool auto_unwrap) const;
-  BLOCKING virtual void close_read_file(std::istream *stream) const;
+  NULLABLE BLOCKING virtual std::istream *open_read_file(bool auto_unwrap) const;
+  BLOCKING virtual void close_read_file(NULLABLE std::istream *stream) const;
   virtual bool was_read_successful() const;
 
   PY_EXTENSION(PyObject *write_file(PyObject *data, bool auto_wrap));
-  BLOCKING virtual std::ostream *open_write_file(bool auto_wrap, bool truncate);
-  BLOCKING virtual std::ostream *open_append_file();
-  BLOCKING virtual void close_write_file(std::ostream *stream);
+  NULLABLE BLOCKING virtual std::ostream *open_write_file(bool auto_wrap, bool truncate);
+  NULLABLE BLOCKING virtual std::ostream *open_append_file();
+  BLOCKING virtual void close_write_file(NULLABLE std::ostream *stream);
 
-  BLOCKING virtual std::iostream *open_read_write_file(bool truncate);
-  BLOCKING virtual std::iostream *open_read_append_file();
-  BLOCKING virtual void close_read_write_file(std::iostream *stream);
+  NULLABLE BLOCKING virtual std::iostream *open_read_write_file(bool truncate);
+  NULLABLE BLOCKING virtual std::iostream *open_read_append_file();
+  BLOCKING virtual void close_read_write_file(NULLABLE std::iostream *stream);
 
   BLOCKING virtual std::streamsize get_file_size(std::istream *stream) const;
   BLOCKING virtual std::streamsize get_file_size() const;

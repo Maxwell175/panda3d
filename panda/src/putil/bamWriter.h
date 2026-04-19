@@ -62,11 +62,11 @@
  */
 class EXPCL_PANDA_PUTIL BamWriter : public BamEnums {
 PUBLISHED:
-  explicit BamWriter(DatagramSink *target = nullptr);
+  explicit BamWriter(NULLABLE DatagramSink *target = nullptr);
   ~BamWriter();
 
-  void set_target(DatagramSink *target);
-  INLINE DatagramSink *get_target();
+  void set_target(NULLABLE DatagramSink *target);
+  NULLABLE INLINE DatagramSink *get_target();
 
   bool init();
   INLINE const Filename &get_filename() const;

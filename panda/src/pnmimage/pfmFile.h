@@ -135,8 +135,8 @@ PUBLISHED:
                          float xr, float yr, float exponent);
 
   bool calc_tight_bounds(LPoint3f &min_point, LPoint3f &max_point) const;
-  BLOCKING PT(BoundingHexahedron) compute_planar_bounds(const LPoint2f &center, PN_float32 point_dist, PN_float32 sample_radius, bool points_only) const;
-  INLINE BLOCKING PT(BoundingHexahedron) compute_planar_bounds(const LPoint2d &center, PN_float32 point_dist, PN_float32 sample_radius, bool points_only) const;
+  NULLABLE BLOCKING PT(BoundingHexahedron) compute_planar_bounds(const LPoint2f &center, PN_float32 point_dist, PN_float32 sample_radius, bool points_only) const;
+  NULLABLE INLINE BLOCKING PT(BoundingHexahedron) compute_planar_bounds(const LPoint2d &center, PN_float32 point_dist, PN_float32 sample_radius, bool points_only) const;
   void compute_sample_point(LPoint3f &result,
                             PN_float32 x, PN_float32 y, PN_float32 sample_radius) const;
 

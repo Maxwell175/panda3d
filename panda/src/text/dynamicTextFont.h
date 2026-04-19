@@ -116,7 +116,7 @@ PUBLISHED:
   MAKE_PROPERTY(tex_format, get_tex_format);
 
   int get_num_pages() const;
-  DynamicTextPage *get_page(int n) const;
+  NULLABLE DynamicTextPage *get_page(int n) const;
   MAKE_SEQ(get_pages, get_num_pages, get_page);
   MAKE_SEQ_PROPERTY(pages, get_num_pages, get_page);
 

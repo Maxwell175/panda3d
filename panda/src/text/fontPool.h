@@ -35,7 +35,7 @@ PUBLISHED:
 
   INLINE static bool has_font(const std::string &filename);
   INLINE static bool verify_font(const std::string &filename);
-  BLOCKING INLINE static TextFont *load_font(const std::string &filename);
+  NULLABLE BLOCKING INLINE static TextFont *load_font(const std::string &filename);
   INLINE static void add_font(const std::string &filename, TextFont *font);
   INLINE static void release_font(const std::string &filename);
   INLINE static void release_all_fonts();
@@ -49,7 +49,7 @@ private:
   INLINE FontPool();
 
   bool ns_has_font(const std::string &str);
-  TextFont *ns_load_font(const std::string &str);
+  NULLABLE TextFont *ns_load_font(const std::string &str);
   void ns_add_font(const std::string &str, TextFont *font);
   void ns_release_font(const std::string &str);
   void ns_release_all_fonts();

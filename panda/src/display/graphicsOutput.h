@@ -224,13 +224,13 @@ PUBLISHED:
   MAKE_SEQ(get_active_display_regions, get_num_active_display_regions, get_active_display_region);
   MAKE_SEQ_PROPERTY(active_display_regions, get_num_active_display_regions, get_active_display_region);
 
-  GraphicsOutput *make_texture_buffer(
+  NULLABLE GraphicsOutput *make_texture_buffer(
       const std::string &name, int x_size, int y_size,
-      Texture *tex = nullptr, bool to_ram = false, FrameBufferProperties *fbp = nullptr);
-  GraphicsOutput *make_cube_map(const std::string &name, int size,
-                                NodePath &camera_rig,
-                                DrawMask camera_mask = PandaNode::get_all_camera_mask(),
-                                bool to_ram = false, FrameBufferProperties *fbp = nullptr);
+      NULLABLE Texture *tex = nullptr, bool to_ram = false, NULLABLE FrameBufferProperties *fbp = nullptr);
+  NULLABLE GraphicsOutput *make_cube_map(const std::string &name, int size,
+                                 NodePath &camera_rig,
+                                 DrawMask camera_mask = PandaNode::get_all_camera_mask(),
+                                 bool to_ram = false, NULLABLE FrameBufferProperties *fbp = nullptr);
 
   INLINE static Filename make_screenshot_filename(
       const std::string &prefix = "screenshot");

@@ -62,7 +62,7 @@ PUBLISHED:
   BLOCKING int unmount_all();
 
   int get_num_mounts() const;
-  PT(VirtualFileMount) get_mount(int n) const;
+  NULLABLE PT(VirtualFileMount) get_mount(int n) const;
   MAKE_SEQ(get_mounts, get_num_mounts, get_mount);
   MAKE_SEQ_PROPERTY(mounts, get_num_mounts, get_mount);
 
@@ -71,9 +71,9 @@ PUBLISHED:
   BLOCKING bool make_directory(const Filename &filename);
   BLOCKING bool make_directory_full(const Filename &filename);
 
-  BLOCKING PT(VirtualFile) get_file(const Filename &filename, bool status_only = false) const;
-  BLOCKING PT(VirtualFile) create_file(const Filename &filename);
-  BLOCKING PT(VirtualFile) find_file(const Filename &filename,
+  NULLABLE BLOCKING PT(VirtualFile) get_file(const Filename &filename, bool status_only = false) const;
+  NULLABLE BLOCKING PT(VirtualFile) create_file(const Filename &filename);
+  NULLABLE BLOCKING PT(VirtualFile) find_file(const Filename &filename,
                                      const DSearchPath &searchpath,
                                      bool status_only = false) const;
   BLOCKING bool delete_file(const Filename &filename);
@@ -89,7 +89,7 @@ PUBLISHED:
   BLOCKING INLINE bool is_directory(const Filename &filename) const;
   BLOCKING INLINE bool is_regular_file(const Filename &filename) const;
 
-  BLOCKING INLINE PT(VirtualFileList) scan_directory(const Filename &filename) const;
+  NULLABLE BLOCKING INLINE PT(VirtualFileList) scan_directory(const Filename &filename) const;
 
   INLINE void ls(const Filename &filename) const;
   INLINE void ls_all(const Filename &filename) const;
@@ -99,17 +99,17 @@ PUBLISHED:
   static VirtualFileSystem *get_global_ptr();
 
   PY_EXTENSION(PyObject *read_file(const Filename &filename, bool auto_unwrap) const);
-  BLOCKING std::istream *open_read_file(const Filename &filename, bool auto_unwrap) const;
-  BLOCKING static void close_read_file(std::istream *stream);
+  NULLABLE BLOCKING std::istream *open_read_file(const Filename &filename, bool auto_unwrap) const;
+  BLOCKING static void close_read_file(NULLABLE std::istream *stream);
 
   PY_EXTENSION(PyObject *write_file(const Filename &filename, PyObject *data, bool auto_wrap));
-  BLOCKING std::ostream *open_write_file(const Filename &filename, bool auto_wrap, bool truncate);
-  BLOCKING std::ostream *open_append_file(const Filename &filename);
-  BLOCKING static void close_write_file(std::ostream *stream);
+  NULLABLE BLOCKING std::ostream *open_write_file(const Filename &filename, bool auto_wrap, bool truncate);
+  NULLABLE BLOCKING std::ostream *open_append_file(const Filename &filename);
+  BLOCKING static void close_write_file(NULLABLE std::ostream *stream);
 
-  BLOCKING std::iostream *open_read_write_file(const Filename &filename, bool truncate);
-  BLOCKING std::iostream *open_read_append_file(const Filename &filename);
-  BLOCKING static void close_read_write_file(std::iostream *stream);
+  NULLABLE BLOCKING std::iostream *open_read_write_file(const Filename &filename, bool truncate);
+  NULLABLE BLOCKING std::iostream *open_read_append_file(const Filename &filename);
+  BLOCKING static void close_read_write_file(NULLABLE std::iostream *stream);
 
 public:
   // We provide Python versions of these as efficient extension methods,

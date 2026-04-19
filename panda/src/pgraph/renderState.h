@@ -106,8 +106,8 @@ PUBLISHED:
 
   INLINE bool has_attrib(TypeHandle type) const;
   INLINE bool has_attrib(int slot) const;
-  INLINE const RenderAttrib *get_attrib(TypeHandle type) const;
-  ALWAYS_INLINE const RenderAttrib *get_attrib(int slot) const;
+  NULLABLE INLINE const RenderAttrib *get_attrib(TypeHandle type) const;
+  NULLABLE ALWAYS_INLINE const RenderAttrib *get_attrib(int slot) const;
   INLINE const RenderAttrib *get_attrib_def(int slot) const;
   INLINE int get_override(TypeHandle type) const;
   INLINE int get_override(int slot) const;

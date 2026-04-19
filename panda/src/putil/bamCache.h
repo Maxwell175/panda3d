@@ -71,7 +71,7 @@ PUBLISHED:
   INLINE void set_read_only(bool ro);
   INLINE bool get_read_only() const;
 
-  PT(BamCacheRecord) lookup(const Filename &source_filename,
+  NULLABLE PT(BamCacheRecord) lookup(const Filename &source_filename,
                             const std::string &cache_extension);
   bool store(BamCacheRecord *record);
 

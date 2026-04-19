@@ -41,9 +41,9 @@ PUBLISHED:
   MAKE_SEQ(get_types, get_num_types, get_type);
   MAKE_SEQ_PROPERTY(types, get_num_types, get_type);
 
-  PNMFileType *get_type_from_extension(const std::string &filename) const;
-  PNMFileType *get_type_from_magic_number(const std::string &magic_number) const;
-  PNMFileType *get_type_by_handle(TypeHandle handle) const;
+  NULLABLE PNMFileType *get_type_from_extension(const std::string &filename) const;
+  NULLABLE PNMFileType *get_type_from_magic_number(const std::string &magic_number) const;
+  NULLABLE PNMFileType *get_type_by_handle(TypeHandle handle) const;
 
   void write(std::ostream &out, int indent_level = 0) const;
 

@@ -616,8 +616,8 @@ PUBLISHED:
   bool has_texture(TextureStage *stage) const;
   bool has_texture_off() const;
   bool has_texture_off(TextureStage *stage) const;
-  Texture *get_texture() const;
-  Texture *get_texture(TextureStage *stage) const;
+  NULLABLE Texture *get_texture() const;
+  NULLABLE Texture *get_texture(TextureStage *stage) const;
   void replace_texture(Texture *tex, Texture *new_tex);
 #ifdef CPPPARSER  // Let interrogate know this also accepts None
   void replace_texture(Texture *tex, std::nullptr_t new_tex);
@@ -672,7 +672,7 @@ PUBLISHED:
   void clear_shader_input(CPT_InternalName id);
   void set_instance_count(int instance_count);
 
-  const Shader *get_shader() const;
+  NULLABLE const Shader *get_shader() const;
   ShaderInput get_shader_input(CPT_InternalName id) const;
   int get_instance_count() const;
 
@@ -772,7 +772,7 @@ PUBLISHED:
   void set_material_off(int priority = 0);
   void clear_material();
   bool has_material() const;
-  PT(Material) get_material() const;
+  NULLABLE PT(Material) get_material() const;
   void replace_material(Material *mat, Material *new_mat);
 #ifdef CPPPARSER  // Let interrogate know this also accepts None
   void replace_material(Material *mat, std::nullptr_t new_mat);
@@ -783,7 +783,7 @@ PUBLISHED:
   void clear_fog();
   bool has_fog() const;
   bool has_fog_off() const;
-  Fog *get_fog() const;
+  NULLABLE Fog *get_fog() const;
 
   void set_render_mode_wireframe(int priority = 0);
   void set_render_mode_filled(int priority = 0);
@@ -900,7 +900,7 @@ PUBLISHED:
   // Miscellaneous
   bool verify_complete(Thread *current_thread = Thread::get_current_thread()) const;
 
-  void premunge_scene(GraphicsStateGuardianBase *gsg = nullptr);
+  void premunge_scene(NULLABLE GraphicsStateGuardianBase *gsg = nullptr);
   void prepare_scene(GraphicsStateGuardianBase *gsg);
 
   void show_bounds();
@@ -961,8 +961,8 @@ PUBLISHED:
   BLOCKING bool write_bam_stream(std::ostream &out) const;
 
   INLINE vector_uchar encode_to_bam_stream() const;
-  bool encode_to_bam_stream(vector_uchar &data, BamWriter *writer = nullptr) const;
-  static NodePath decode_from_bam_stream(vector_uchar data, BamReader *reader = nullptr);
+  bool encode_to_bam_stream(vector_uchar &data, NULLABLE BamWriter *writer = nullptr) const;
+  static NodePath decode_from_bam_stream(vector_uchar data, NULLABLE BamReader *reader = nullptr);
 
 private:
   bool replace_copied_nodes(const NodePath &source, const NodePath &dest,

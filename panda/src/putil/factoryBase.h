@@ -45,21 +45,21 @@ public:
 
   FactoryBase &operator = (const FactoryBase &copy) = delete;
 
-  TypedObject *make_instance(TypeHandle handle,
+  NULLABLE TypedObject *make_instance(TypeHandle handle,
                              const FactoryParams &params);
 
-  INLINE TypedObject *make_instance(const std::string &type_name,
+  NULLABLE INLINE TypedObject *make_instance(const std::string &type_name,
                                     const FactoryParams &params);
 
-  TypedObject *make_instance_more_general(TypeHandle handle,
+  NULLABLE TypedObject *make_instance_more_general(TypeHandle handle,
                                           const FactoryParams &params);
 
-  INLINE TypedObject *make_instance_more_general(const std::string &type_name,
+  NULLABLE INLINE TypedObject *make_instance_more_general(const std::string &type_name,
                                                  const FactoryParams &params);
 
   TypeHandle find_registered_type(TypeHandle handle);
 
-  void register_factory(TypeHandle handle, BaseCreateFunc *func, void *user_data = nullptr);
+  void register_factory(TypeHandle handle, BaseCreateFunc *func, NULLABLE void *user_data = nullptr);
 
   size_t get_num_types() const;
   TypeHandle get_type(size_t n) const;

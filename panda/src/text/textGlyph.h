@@ -47,7 +47,7 @@ PUBLISHED:
 
   virtual bool is_whitespace() const;
 
-  PT(Geom) get_geom(Geom::UsageHint usage_hint) const;
+  NULLABLE PT(Geom) get_geom(Geom::UsageHint usage_hint) const;
 
 public:
   void calc_tight_bounds(LPoint3 &min_point, LPoint3 &max_point,

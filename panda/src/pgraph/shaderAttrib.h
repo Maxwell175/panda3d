@@ -43,7 +43,7 @@ private:
   INLINE ShaderAttrib(const ShaderAttrib &copy);
 
 PUBLISHED:
-  static CPT(RenderAttrib) make(const Shader *shader = nullptr, int priority = 0);
+  static CPT(RenderAttrib) make(NULLABLE const Shader *shader = nullptr, int priority = 0);
   static CPT(RenderAttrib) make_off();
   static CPT(RenderAttrib) make_default();
 

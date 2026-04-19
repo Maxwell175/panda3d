@@ -97,7 +97,7 @@ PUBLISHED:
 
   void set_aux_scene_data(const NodePath &node_path, AuxSceneData *data);
   bool clear_aux_scene_data(const NodePath &node_path);
-  AuxSceneData *get_aux_scene_data(const NodePath &node_path) const;
+  NULLABLE AuxSceneData *get_aux_scene_data(const NodePath &node_path) const;
   void list_aux_scene_data(std::ostream &out) const;
   int cleanup_aux_scene_data(Thread *current_thread = Thread::get_current_thread());
   MAKE_MAP_PROPERTY(aux_scene_data, get_aux_scene_data, get_aux_scene_data,

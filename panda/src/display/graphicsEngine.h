@@ -79,23 +79,23 @@ PUBLISHED:
   INLINE Loader *get_default_loader() const;
   MAKE_PROPERTY(default_loader, get_default_loader, set_default_loader);
 
-  GraphicsOutput *make_output(GraphicsPipe *pipe,
+  NULLABLE GraphicsOutput *make_output(GraphicsPipe *pipe,
                               const std::string &name, int sort,
                               const FrameBufferProperties &fb_prop,
                               const WindowProperties &win_prop,
-                              int flags, GraphicsStateGuardian *gsg = nullptr,
-                              GraphicsOutput *host = nullptr);
+                              int flags, NULLABLE GraphicsStateGuardian *gsg = nullptr,
+                              NULLABLE GraphicsOutput *host = nullptr);
 
   // Syntactic shorthand versions of make_output
-  INLINE GraphicsOutput *make_buffer(GraphicsOutput *host,
+  NULLABLE INLINE GraphicsOutput *make_buffer(NULLABLE GraphicsOutput *host,
                                      const std::string &name, int sort,
                                      int x_size, int y_size);
-  INLINE GraphicsOutput *make_buffer(GraphicsStateGuardian *gsg,
+  NULLABLE INLINE GraphicsOutput *make_buffer(NULLABLE GraphicsStateGuardian *gsg,
                                      const std::string &name, int sort,
                                      int x_size, int y_size);
-  INLINE GraphicsOutput *make_parasite(GraphicsOutput *host,
-                                       const std::string &name, int sort,
-                                       int x_size, int y_size);
+  NULLABLE INLINE GraphicsOutput *make_parasite(NULLABLE GraphicsOutput *host,
+                                        const std::string &name, int sort,
+                                        int x_size, int y_size);
 
   bool add_window(GraphicsOutput *window, int sort);
   bool remove_window(GraphicsOutput *window);
@@ -104,7 +104,7 @@ PUBLISHED:
 
   bool is_empty() const;
   int get_num_windows() const;
-  GraphicsOutput *get_window(int n) const;
+  NULLABLE GraphicsOutput *get_window(int n) const;
   MAKE_SEQ(get_windows, get_num_windows, get_window);
   MAKE_SEQ_PROPERTY(windows, get_num_windows, get_window);
 

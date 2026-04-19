@@ -49,7 +49,7 @@ PUBLISHED:
   virtual void clear();
 
   void set_connection(const PT(Connection) &connection);
-  PT(Connection) get_connection() const;
+  NULLABLE PT(Connection) get_connection() const;
 
   void set_address(const NetAddress &address);
   const NetAddress &get_address() const;

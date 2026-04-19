@@ -49,6 +49,8 @@
 // interrogate pass (CPPPARSER isn't defined), this maps to public.
 #define PUBLISHED __published
 
+#define NULLABLE [[in::nullable]]
+
 typedef int ios_openmode;
 typedef int ios_fmtflags;
 typedef int ios_iostate;
@@ -134,6 +136,8 @@ typedef std::ios::seekdir ios_seekdir;
 // via interrogate to scripting languages.  However, if we're not running the
 // interrogate pass (CPPPARSER isn't defined), this maps to public.
 #define PUBLISHED public
+
+#define NULLABLE
 
 #endif  // CPPPARSER
 

@@ -57,12 +57,12 @@ PUBLISHED:
   MAKE_PROPERTY(clock, get_clock, set_clock);
 
   int get_num_task_chains() const;
-  AsyncTaskChain *get_task_chain(int n) const;
+  NULLABLE AsyncTaskChain *get_task_chain(int n) const;
   MAKE_SEQ(get_task_chains, get_num_task_chains, get_task_chain);
   AsyncTaskChain *make_task_chain(const std::string &name);
   AsyncTaskChain *make_task_chain(const std::string &name, int num_threads,
                                   ThreadPriority thread_priority);
-  AsyncTaskChain *find_task_chain(const std::string &name);
+  NULLABLE AsyncTaskChain *find_task_chain(const std::string &name);
   BLOCKING bool remove_task_chain(const std::string &name);
 
   void add(AsyncTask *task);

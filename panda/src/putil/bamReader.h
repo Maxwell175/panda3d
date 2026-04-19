@@ -115,17 +115,17 @@ public:
 
 PUBLISHED:
   // The primary interface for a caller.
-  explicit BamReader(DatagramGenerator *source = nullptr);
+  explicit BamReader(NULLABLE DatagramGenerator *source = nullptr);
   ~BamReader();
 
-  void set_source(DatagramGenerator *source);
+  void set_source(NULLABLE DatagramGenerator *source);
   INLINE DatagramGenerator *get_source();
 
   bool init();
 
   class AuxData;
-  void set_aux_data(TypedWritable *obj, const std::string &name, AuxData *data);
-  AuxData *get_aux_data(TypedWritable *obj, const std::string &name) const;
+  void set_aux_data(TypedWritable *obj, const std::string &name, NULLABLE AuxData *data);
+  NULLABLE AuxData *get_aux_data(TypedWritable *obj, const std::string &name) const;
 
   INLINE const Filename &get_filename() const;
 
@@ -135,7 +135,7 @@ PUBLISHED:
 #if defined(CPPPARSER) && defined(HAVE_PYTHON)
   EXTENSION(PyObject *read_object());
 #else
-  BLOCKING TypedWritable *read_object();
+  NULLABLE BLOCKING TypedWritable *read_object();
   BLOCKING bool read_object(TypedWritable *&ptr, ReferenceCount *&ref_ptr);
 #endif
 
@@ -180,7 +180,7 @@ public:
   int get_int_tag(const std::string &tag) const;
 
   void set_aux_tag(const std::string &tag, BamReaderAuxData *value);
-  BamReaderAuxData *get_aux_tag(const std::string &tag) const;
+  NULLABLE BamReaderAuxData *get_aux_tag(const std::string &tag) const;
 
   void register_finalize(TypedWritable *whom);
 

@@ -182,13 +182,13 @@ PUBLISHED:
   bool run();
   INLINE void begin_connect_to(const DocumentSpec &url);
 
-  std::istream *open_read_body();
+  NULLABLE std::istream *open_read_body();
   void close_read_body(std::istream *stream) const;
 
   BLOCKING bool download_to_file(const Filename &filename, bool subdocument_resumes = true);
   BLOCKING bool download_to_ram(Ramfile *ramfile, bool subdocument_resumes = true);
   BLOCKING bool download_to_stream(std::ostream *strm, bool subdocument_resumes = true);
-  SocketStream *get_connection();
+  NULLABLE SocketStream *get_connection();
 
   INLINE size_t get_bytes_downloaded() const;
   INLINE size_t get_bytes_requested() const;

@@ -63,8 +63,8 @@ PUBLISHED:
   static TextPropertiesManager *get_global_ptr();
 
 public:
-  const TextProperties *get_properties_ptr(const std::string &name);
-  const TextGraphic *get_graphic_ptr(const std::string &name);
+  NULLABLE const TextProperties *get_properties_ptr(const std::string &name);
+  NULLABLE const TextGraphic *get_graphic_ptr(const std::string &name);
 
 private:
   typedef pmap<std::string, TextProperties> Properties;

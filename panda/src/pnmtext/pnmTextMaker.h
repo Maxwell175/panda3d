@@ -70,7 +70,7 @@ PUBLISHED:
   INLINE int calc_width(const std::string &text);
   int calc_width(const std::wstring &text);
 
-  PNMTextGlyph *get_glyph(int character);
+  NULLABLE PNMTextGlyph *get_glyph(int character);
 
 private:
   void initialize();

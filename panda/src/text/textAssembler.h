@@ -79,14 +79,14 @@ PUBLISHED:
 
   INLINE int get_num_characters() const;
   INLINE char32_t get_character(int n) const;
-  INLINE const TextGraphic *get_graphic(int n) const;
+  NULLABLE INLINE const TextGraphic *get_graphic(int n) const;
   INLINE const TextProperties &get_properties(int n) const;
   INLINE PN_stdfloat get_width(int n) const;
 
   INLINE int get_num_rows() const;
   INLINE int get_num_cols(int r) const;
   INLINE char32_t get_character(int r, int c) const;
-  INLINE const TextGraphic *get_graphic(int r, int c) const;
+  NULLABLE INLINE const TextGraphic *get_graphic(int r, int c) const;
   INLINE const TextProperties &get_properties(int r, int c) const;
   INLINE PN_stdfloat get_width(int r, int c) const;
   PN_stdfloat get_xpos(int r, int c) const;

@@ -41,8 +41,8 @@ public:
   };
 
   void add_output(BufferType buffer_type, OutputType output_type,
-                  std::ostream *out = nullptr,
-                  FILE *fout = nullptr,
+                  NULLABLE std::ostream *out = nullptr,
+                  NULLABLE FILE *fout = nullptr,
                   bool owns_obj = false);
 
   void flush();

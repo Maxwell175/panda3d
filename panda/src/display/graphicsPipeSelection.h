@@ -41,11 +41,11 @@ PUBLISHED:
   MAKE_SEQ_PROPERTY(pipe_types, get_num_pipe_types, get_pipe_type);
   void print_pipe_types() const;
 
-  PT(GraphicsPipe) make_pipe(const std::string &type_name,
+  NULLABLE PT(GraphicsPipe) make_pipe(const std::string &type_name,
                              const std::string &module_name = std::string());
-  PT(GraphicsPipe) make_pipe(TypeHandle type);
-  PT(GraphicsPipe) make_module_pipe(const std::string &module_name);
-  PT(GraphicsPipe) make_default_pipe();
+  NULLABLE PT(GraphicsPipe) make_pipe(TypeHandle type);
+  NULLABLE PT(GraphicsPipe) make_module_pipe(const std::string &module_name);
+  NULLABLE PT(GraphicsPipe) make_default_pipe();
 
   INLINE int get_num_aux_modules() const;
   void load_aux_modules();

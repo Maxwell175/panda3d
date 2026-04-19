@@ -58,9 +58,9 @@ class PNMFileType;
 class EXPCL_PANDA_PNMIMAGE PNMImage : public PNMImageHeader {
 PUBLISHED:
   INLINE PNMImage();
-  explicit PNMImage(const Filename &filename, PNMFileType *type = nullptr);
+  explicit PNMImage(const Filename &filename, NULLABLE PNMFileType *type = nullptr);
   INLINE explicit PNMImage(int x_size, int y_size, int num_channels = 3,
-                           xelval maxval = 255, PNMFileType *type = nullptr,
+                           xelval maxval = 255, NULLABLE PNMFileType *type = nullptr,
                            ColorSpace color_space = CS_linear);
   INLINE PNMImage(const PNMImage &copy);
   INLINE void operator = (const PNMImage &copy);
@@ -77,7 +77,7 @@ PUBLISHED:
 
   void clear();
   void clear(int x_size, int y_size, int num_channels = 3,
-             xelval maxval = 255, PNMFileType *type = nullptr,
+             xelval maxval = 255, NULLABLE PNMFileType *type = nullptr,
              ColorSpace color_space = CS_linear);
 
   void copy_from(const PNMImage &copy);
@@ -102,16 +102,16 @@ PUBLISHED:
   INLINE int get_read_y_size() const;
   INLINE ColorSpace get_color_space() const;
 
-  BLOCKING bool read(const Filename &filename, PNMFileType *type = nullptr,
+  BLOCKING bool read(const Filename &filename, NULLABLE PNMFileType *type = nullptr,
                      bool report_unknown_type = true);
   BLOCKING bool read(std::istream &data, const std::string &filename = std::string(),
-                     PNMFileType *type = nullptr,
+                     NULLABLE PNMFileType *type = nullptr,
                      bool report_unknown_type = true);
   BLOCKING bool read(PNMReader *reader);
 
-  BLOCKING bool write(const Filename &filename, PNMFileType *type = nullptr) const;
+  BLOCKING bool write(const Filename &filename, NULLABLE PNMFileType *type = nullptr) const;
   BLOCKING bool write(std::ostream &data, const std::string &filename = std::string(),
-                      PNMFileType *type = nullptr) const;
+                      NULLABLE PNMFileType *type = nullptr) const;
   BLOCKING bool write(PNMWriter *writer) const;
 
   INLINE bool is_valid() const;

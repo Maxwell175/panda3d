@@ -85,25 +85,25 @@ PUBLISHED:
   INLINE void set_type(PNMFileType *type);
   MAKE_PROPERTY2(type, has_type, get_type);
 
-  BLOCKING bool read_header(const Filename &filename, PNMFileType *type = nullptr,
+  BLOCKING bool read_header(const Filename &filename, NULLABLE PNMFileType *type = nullptr,
                             bool report_unknown_type = true);
   BLOCKING bool read_header(std::istream &data, const std::string &filename = std::string(),
-                            PNMFileType *type = nullptr, bool report_unknown_type = true);
+                            NULLABLE PNMFileType *type = nullptr, bool report_unknown_type = true);
 
-  PNMReader *make_reader(const Filename &filename,
-                         PNMFileType *type = nullptr,
+  NULLABLE PNMReader *make_reader(const Filename &filename,
+                         NULLABLE PNMFileType *type = nullptr,
                          bool report_unknown_type = true) const;
-  PNMReader *make_reader(std::istream *file, bool owns_file = true,
+  NULLABLE PNMReader *make_reader(std::istream *file, bool owns_file = true,
                          const Filename &filename = Filename(),
                          std::string magic_number = std::string(),
-                         PNMFileType *type = nullptr,
+                         NULLABLE PNMFileType *type = nullptr,
                          bool report_unknown_type = true) const;
 
-  PNMWriter *make_writer(const Filename &filename,
-                         PNMFileType *type = nullptr) const;
-  PNMWriter *make_writer(std::ostream *file, bool owns_file = true,
+  NULLABLE PNMWriter *make_writer(const Filename &filename,
+                         NULLABLE PNMFileType *type = nullptr) const;
+  NULLABLE PNMWriter *make_writer(std::ostream *file, bool owns_file = true,
                          const Filename &filename = Filename(),
-                         PNMFileType *type = nullptr) const;
+                         NULLABLE PNMFileType *type = nullptr) const;
 
   static bool read_magic_number(std::istream *file, std::string &magic_number,
                                 int num_bytes);
