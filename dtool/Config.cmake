@@ -221,11 +221,40 @@ mark_as_advanced(DEFAULT_PRC_DIR PRC_DIR_ENVVARS PRC_PATH_ENVVARS
 # The following options relate to interrogate, the tool that is
 # used to generate bindings for non-C++ languages.
 
+# Declare C# option first so we can suppress Python before its dependent
+# option evaluates its condition.
+option(INTERROGATE_CSHARP_INTERFACE
+  "Generate C# P/Invoke bindings. Mutually exclusive with INTERROGATE_PYTHON_INTERFACE." OFF)
+
+if(INTERROGATE_CSHARP_INTERFACE)
+  set(HAVE_CSHARP ON)
+  # C# and Python bindings are mutually exclusive.  Force HAVE_PYTHON off so
+  # that cmake_dependent_option(INTERROGATE_PYTHON_INTERFACE ...) below
+  # evaluates to OFF automatically.
+  if(HAVE_PYTHON)
+    message(STATUS
+      "INTERROGATE_CSHARP_INTERFACE is ON — forcing HAVE_PYTHON to OFF. "
+      "C# and Python bindings are mutually exclusive.")
+    set(HAVE_PYTHON OFF)
+  endif()
+else()
+  set(HAVE_CSHARP OFF)
+endif()
+
 cmake_dependent_option(INTERROGATE_PYTHON_INTERFACE
   "Do you want to generate a Python-callable interrogate interface?
 This is only necessary if you plan to make calls into Panda from a
 program written in Python.  This is done only if HAVE_PYTHON is also
 true." ON "HAVE_PYTHON" OFF)
+
+# Safety guard: catch any configuration where both ended up enabled
+# (e.g. if INTERROGATE_PYTHON_INTERFACE was forced on by the user explicitly).
+if(INTERROGATE_CSHARP_INTERFACE AND INTERROGATE_PYTHON_INTERFACE)
+  message(FATAL_ERROR
+    "INTERROGATE_CSHARP_INTERFACE and INTERROGATE_PYTHON_INTERFACE cannot "
+    "both be enabled at the same time.  C# and Python bindings are mutually "
+    "exclusive — disable one before enabling the other.")
+endif()
 
 set(INTERROGATE_C_INTERFACE
   "Do you want to generate a C-callable interrogate interface?  This
@@ -242,6 +271,9 @@ probably don't want to mess with this.")
 option(INTERROGATE_VERBOSE
   "Set this if you would like interrogate to generate advanced
 debugging information." OFF)
+
+set(CSHARP_OUTPUT_DIR "${PROJECT_BINARY_DIR}/csharp" CACHE PATH
+  "Output directory for generated C# binding files.")
 
 set(_default_build_interrogate OFF)
 if (INTERROGATE_C_INTERFACE OR INTERROGATE_PYTHON_INTERFACE)
@@ -261,11 +293,19 @@ if(BUILD_INTERROGATE)
 
   set(_interrogate_dir "${PROJECT_BINARY_DIR}/interrogate")
 
+  set(_interrogate_byproducts
+    "${_interrogate_dir}/bin/interrogate"
+    "${_interrogate_dir}/bin/interrogate_module"
+  )
+  if(INTERROGATE_CSHARP_INTERFACE)
+    list(APPEND _interrogate_byproducts "${_interrogate_dir}/bin/interrogate_csharp")
+  endif()
+
   ExternalProject_Add(
     panda3d-interrogate
 
-    GIT_REPOSITORY https://github.com/panda3d/interrogate.git
-    GIT_TAG 7cf2550d2c8d95b8c268aa4bb0b5602e85a086dc
+    GIT_REPOSITORY https://github.com/Maxwell175/interrogate.git
+    GIT_TAG csharp
 
     PREFIX ${_interrogate_dir}
     CMAKE_ARGS
@@ -274,8 +314,7 @@ if(BUILD_INTERROGATE)
       -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
 
     EXCLUDE_FROM_ALL ON
-    BUILD_BYPRODUCTS "${_interrogate_dir}/bin/interrogate"
-                     "${_interrogate_dir}/bin/interrogate_module"
+    BUILD_BYPRODUCTS ${_interrogate_byproducts}
   )
 
   add_executable(interrogate IMPORTED GLOBAL)
@@ -286,6 +325,12 @@ if(BUILD_INTERROGATE)
   add_dependencies(interrogate_module panda3d-interrogate)
   set_target_properties(interrogate_module PROPERTIES IMPORTED_LOCATION "${_interrogate_dir}/bin/interrogate_module")
 
+  if(INTERROGATE_CSHARP_INTERFACE)
+    add_executable(interrogate_csharp IMPORTED GLOBAL)
+    add_dependencies(interrogate_csharp panda3d-interrogate)
+    set_target_properties(interrogate_csharp PROPERTIES IMPORTED_LOCATION "${_interrogate_dir}/bin/interrogate_csharp")
+  endif()
+
 else()
   find_program(INTERROGATE_EXECUTABLE interrogate)
   find_program(INTERROGATE_MODULE_EXECUTABLE interrogate_module)
@@ -295,7 +340,7 @@ else()
     set_target_properties(interrogate PROPERTIES
       IMPORTED_LOCATION "${INTERROGATE_EXECUTABLE}")
 
-  elseif(INTERROGATE_PYTHON_INTERFACE OR INTERROGATE_C_INTERFACE)
+  elseif(INTERROGATE_PYTHON_INTERFACE OR INTERROGATE_C_INTERFACE OR INTERROGATE_CSHARP_INTERFACE)
     message(FATAL_ERROR
       "Requested interrogate bindings, but interrogate not found.  Set "
       "BUILD_INTERROGATE to build interrogate from source, or set "
@@ -309,9 +354,30 @@ else()
 
   elseif(INTERROGATE_PYTHON_INTERFACE)
     message(FATAL_ERROR
-      "Requested interrogate bindings, but interrogate not found.  Set "
+      "Requested interrogate bindings, but interrogate_module not found.  Set "
       "BUILD_INTERROGATE to build interrogate from source, or set "
       "INTERROGATE_MODULE_EXECUTABLE to the location of this tool.")
+  endif()
+
+  if(INTERROGATE_CSHARP_INTERFACE)
+    # Look for interrogate_csharp next to the interrogate executable
+    if(INTERROGATE_EXECUTABLE)
+      get_filename_component(_igate_dir "${INTERROGATE_EXECUTABLE}" DIRECTORY)
+      find_program(INTERROGATE_CSHARP_EXECUTABLE interrogate_csharp
+        HINTS "${_igate_dir}" NO_DEFAULT_PATH)
+    endif()
+    find_program(INTERROGATE_CSHARP_EXECUTABLE interrogate_csharp)
+
+    add_executable(interrogate_csharp IMPORTED GLOBAL)
+    if(INTERROGATE_CSHARP_EXECUTABLE)
+      set_target_properties(interrogate_csharp PROPERTIES
+        IMPORTED_LOCATION "${INTERROGATE_CSHARP_EXECUTABLE}")
+    else()
+      message(FATAL_ERROR
+        "Requested C# interrogate bindings, but interrogate_csharp not found.  "
+        "Set BUILD_INTERROGATE to build from source, or set "
+        "INTERROGATE_CSHARP_EXECUTABLE to the location of this tool.")
+    endif()
   endif()
 
 endif()

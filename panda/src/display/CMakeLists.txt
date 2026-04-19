@@ -96,6 +96,14 @@ if(APPLE)
   )
 endif()
 
+if(HAVE_CSHARP)
+  set(P3DISPLAY_IGATEEXT ${P3DISPLAY_IGATEEXT}
+    graphicsEngine_ext_csharp.h
+    graphicsEngine_ext_csharp.cxx)
+  set(P3DISPLAY_SOURCES ${P3DISPLAY_SOURCES}
+    graphicsEngine_ext_csharp.cxx)
+endif()
+
 # This is a large file; let's build it separately
 set_source_files_properties(graphicsStateGuardian.cxx PROPERTIES SKIP_UNITY_BUILD_INCLUSION YES)
 
@@ -105,6 +113,14 @@ add_component_library(p3display SYMBOL BUILDING_PANDA_DISPLAY
 target_link_libraries(p3display p3cull p3device p3pgraphnodes
   PKG::X11)
 target_interrogate(p3display ALL EXTENSIONS ${P3DISPLAY_IGATEEXT})
+
+if(NOT BUILD_SHARED_LIBS)
+  foreach(var HAVE_GL HAVE_TINYDISPLAY HAVE_DX9 HAVE_EGG)
+    if(${var})
+      target_compile_definitions(p3display PRIVATE ${var})
+    endif()
+  endforeach()
+endif()
 
 if(HAVE_EIGEN)
   # Eigen puts this over the threshold where bigobj is needed on MSVC

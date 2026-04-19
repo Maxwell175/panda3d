@@ -1,0 +1,102 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    Panda3D NativeAOT + Dynamic linking targets.
+
+    For development (dotnet run / dotnet build):
+      - Copies all dynamic .so/.dll files to the output directory.
+      - NativeResolver probes the assembly directory so each metalib is found
+        by its own name (libpanda.so, libpandaegg.so, …) without requiring
+        LD_LIBRARY_PATH or a linker stub.
+
+    For NativeAOT publish (dotnet publish -p:PublishAot=true):
+      - Uses DirectPInvoke to statically resolve all P/Invoke calls.
+      - Links against panda3d static archives and bundled thirdparty archives.
+      - Adds OS/system library linker flags.
+  -->
+
+  <!-- ================================================================== -->
+  <!-- Paths — override these properties to point at your build dirs      -->
+  <!-- ================================================================== -->
+  <PropertyGroup>
+    <Panda3DSourceRoot Condition="'$(Panda3DSourceRoot)' == ''">$(MSBuildThisFileDirectory)../</Panda3DSourceRoot>
+    <Panda3DDynamicLibDir Condition="'$(Panda3DDynamicLibDir)' == ''">$(Panda3DSourceRoot)cmake-build-debug/lib/</Panda3DDynamicLibDir>
+    <Panda3DStaticLibDir Condition="'$(Panda3DStaticLibDir)' == ''">$(Panda3DSourceRoot)cmake-build-static/lib/</Panda3DStaticLibDir>
+    <!-- Platform-specific thirdparty subdirectory built by panda3d-thirdparty -->
+    <Panda3DThirdpartyDir Condition="'$(Panda3DThirdpartyDir)' == '' AND $([MSBuild]::IsOSPlatform(Linux))">$(Panda3DSourceRoot)thirdparty/linux-libs-x64/</Panda3DThirdpartyDir>
+    <Panda3DThirdpartyDir Condition="'$(Panda3DThirdpartyDir)' == '' AND $([MSBuild]::IsOSPlatform(OSX))">$(Panda3DSourceRoot)thirdparty/darwin-libs-a/</Panda3DThirdpartyDir>
+    <Panda3DThirdpartyDir Condition="'$(Panda3DThirdpartyDir)' == '' AND $([MSBuild]::IsOSPlatform(Windows))">$(Panda3DSourceRoot)thirdparty/win-libs-vc14-x64/</Panda3DThirdpartyDir>
+  </PropertyGroup>
+
+  <!-- ================================================================== -->
+  <!-- Dynamic linking (development) — copy .so files to output           -->
+  <!-- Only for executable projects without NativeAOT                     -->
+  <!-- ================================================================== -->
+  <ItemGroup Condition="'$(PublishAot)' != 'true' AND '$(OutputType)' == 'Exe'">
+    <None Include="$(Panda3DDynamicLibDir)*.so*"
+          CopyToOutputDirectory="PreserveNewest"
+          Link="%(Filename)%(Extension)"
+          Visible="false" />
+  </ItemGroup>
+
+  <!-- ================================================================== -->
+  <!-- NativeAOT static linking (publish)                                 -->
+  <!-- ================================================================== -->
+  <Target Name="_Panda3DDirectPInvoke" BeforeTargets="PrepareForBuild" Condition="'$(PublishAot)' == 'true'">
+    <!-- Linux / macOS: lib<name>.a — strip the 3-char "lib" prefix -->
+    <ItemGroup Condition="!$([MSBuild]::IsOSPlatform(Windows))">
+      <!-- Panda3D own static archives -->
+      <_P3Lib Include="$(Panda3DStaticLibDir)*.a" />
+      <!-- Thirdparty static archives from the local panda3d-thirdparty build -->
+      <_P3Lib Include="$(Panda3DThirdpartyDir)**/lib/*.a" Condition="'$(Panda3DThirdpartyDir)' != '' AND Exists('$(Panda3DThirdpartyDir)')" />
+      <NativeLibrary Include="@(_P3Lib)" />
+      <DirectPInvoke Include="$([System.String]::Copy('%(_P3Lib.Filename)').Substring(3))" />
+    </ItemGroup>
+    <!-- Windows: <name>.lib — Filename already matches the P/Invoke name -->
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(Windows))">
+      <_P3Lib Include="$(Panda3DStaticLibDir)*.lib" />
+      <_P3Lib Include="$(Panda3DThirdpartyDir)**\lib\*.lib" Condition="'$(Panda3DThirdpartyDir)' != '' AND Exists('$(Panda3DThirdpartyDir)')" />
+      <NativeLibrary Include="@(_P3Lib)" />
+      <DirectPInvoke Include="%(_P3Lib.Filename)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    OS/system library dependencies for NativeAOT static linking.
+    Thirdparty deps are covered by the NativeLibrary glob above.
+  -->
+
+  <!-- Linux: display system + C++ runtime -->
+  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Linux))' == 'true'">
+    <LinkerArg Include="-lGL" />
+    <LinkerArg Include="-lEGL" />
+    <LinkerArg Include="-lX11" />
+    <LinkerArg Include="-lXext" />
+    <LinkerArg Include="-lSM" />
+    <LinkerArg Include="-lICE" />
+    <LinkerArg Include="-ldl" />
+    <LinkerArg Include="-lm" />
+    <LinkerArg Include="-lstdc++" />
+    <LinkerArg Include="-lpthread" />
+  </ItemGroup>
+
+  <!-- macOS: system frameworks -->
+  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
+    <LinkerArg Include="-framework OpenGL" />
+    <LinkerArg Include="-framework Cocoa" />
+    <LinkerArg Include="-framework IOKit" />
+    <LinkerArg Include="-framework CoreVideo" />
+    <LinkerArg Include="-framework AudioUnit" />
+    <LinkerArg Include="-framework AudioToolbox" />
+    <LinkerArg Include="-framework CoreAudio" />
+  </ItemGroup>
+
+  <!-- Windows: system libs not auto-linked by the .NET NativeAOT toolchain -->
+  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Windows))' == 'true'">
+    <LinkerArg Include="opengl32.lib" />
+    <LinkerArg Include="winmm.lib" />
+    <LinkerArg Include="ws2_32.lib" />
+    <LinkerArg Include="crypt32.lib" />
+  </ItemGroup>
+
+</Project>

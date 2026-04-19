@@ -127,7 +127,10 @@ PUBLISHED:
                                const ShaderAttrib *sattr,
                                GraphicsStateGuardian *gsg);
 
+  CSHARP_EXTENSION(static GraphicsEngine *get_global_ptr());
+#ifndef CPPPARSER
   static GraphicsEngine *get_global_ptr();
+#endif
 
 public:
   enum ThreadState {

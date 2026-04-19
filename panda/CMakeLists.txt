@@ -106,6 +106,33 @@ if(HAVE_FREETYPE)
   list(APPEND CORE_MODULE_COMPONENTS p3pnmtext)
 endif()
 
+if(INTERROGATE_CSHARP_INTERFACE)
+  add_csharp_module(panda3d.core ${CORE_MODULE_COMPONENTS} LINK panda)
+
+  if(HAVE_BULLET)
+    add_csharp_module(panda3d.bullet p3bullet)
+  endif()
+
+  if(HAVE_EGG)
+    add_csharp_module(panda3d.egg p3egg p3egg2pg LINK pandaegg)
+  endif()
+
+  add_csharp_module(panda3d.fx pandafx)
+  add_csharp_module(panda3d.physics p3physics p3particlesystem LINK pandaphysics)
+
+  if(HAVE_ODE)
+    add_csharp_module(panda3d.ode p3ode)
+  endif()
+
+  if(HAVE_OPENCV OR HAVE_ARTOOLKIT)
+    add_csharp_module(panda3d.vision p3vision)
+  endif()
+
+  if(HAVE_VRPN)
+    add_csharp_module(panda3d.vrpn p3vrpn)
+  endif()
+endif()
+
 if(INTERROGATE_PYTHON_INTERFACE)
   add_python_module(panda3d.core ${CORE_MODULE_COMPONENTS} LINK panda INIT pyenv_init)
 

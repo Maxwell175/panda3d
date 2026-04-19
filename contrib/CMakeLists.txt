@@ -7,6 +7,11 @@ add_subdirectory(src/ai)
 add_subdirectory(src/contribbase)
 add_subdirectory(src/rplight)
 
+if(INTERROGATE_CSHARP_INTERFACE)
+  add_csharp_module(panda3d.ai p3ai)
+  add_csharp_module(panda3d._rplight p3rplight)
+endif()
+
 if(HAVE_PYTHON)
   add_python_module(panda3d.ai p3ai
     IMPORT panda3d.core COMPONENT ContribPython)

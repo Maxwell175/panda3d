@@ -22,6 +22,18 @@
 
 #include <algorithm>
 
+#ifdef LINK_ALL_STATIC
+#if defined(HAVE_DX9)
+extern "C" int get_pipe_type_pandadx9();
+#endif
+#if defined(HAVE_GL)
+extern "C" int get_pipe_type_pandagl();
+#endif
+#if defined(HAVE_TINYDISPLAY)
+extern "C" int get_pipe_type_p3tinydisplay();
+#endif
+#endif
+
 using std::string;
 
 GraphicsPipeSelection *GraphicsPipeSelection::_global_ptr = nullptr;
@@ -408,8 +420,27 @@ load_named_module(const string &name) {
     return (*mi).second._default_pipe_type;
   }
 
-  // We have not yet loaded this module.  Load it now.
+  void *dso_symbol = nullptr;
+  string symbol_name = "get_pipe_type_" + name;
   Filename dlname = Filename::dso_filename("lib" + name + ".so");
+
+#ifdef LINK_ALL_STATIC
+#if defined(HAVE_DX9)
+  if (name == "pandadx9") {
+    dso_symbol = (void*)get_pipe_type_pandadx9;
+  }
+#endif
+#if defined(HAVE_GL)
+  if (name == "pandagl") {
+    dso_symbol = (void*)get_pipe_type_pandagl;
+  }
+#endif
+#if defined(HAVE_TINYDISPLAY)
+  if (name == "p3tinydisplay") {
+    dso_symbol = (void*)get_pipe_type_p3tinydisplay;
+  }
+#endif
+#else
   display_cat.info()
     << "loading display module: " << dlname.to_os_specific() << std::endl;
   void *handle = load_dso(get_plugin_path().get_value(), dlname);
@@ -420,10 +451,8 @@ load_named_module(const string &name) {
     return TypeHandle::none();
   }
 
-  // Now get the module's recommended pipe type.  This requires calling a
-  // specially-named function that should have been exported from the module.
-  string symbol_name = "get_pipe_type_" + name;
-  void *dso_symbol = get_dso_symbol(handle, symbol_name);
+  dso_symbol = get_dso_symbol(handle, symbol_name);
+#endif
   if (display_cat.is_debug()) {
     display_cat.debug()
       << "symbol of " << symbol_name << " = " << dso_symbol << "\n";
@@ -468,10 +497,12 @@ load_named_module(const string &name) {
       << "\n";
   }
 
+#if !defined(LINK_ALL_STATIC)
   LoadedModule &module = _loaded_modules[name];
   module._module_name = name;
   module._module_handle = handle;
   module._default_pipe_type = pipe_type;
+#endif
 
   return pipe_type;
 }

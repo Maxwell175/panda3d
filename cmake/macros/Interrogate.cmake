@@ -40,6 +40,8 @@ if(INTERROGATE_VERBOSE)
   list(APPEND IGATE_FLAGS "-v")
 endif()
 
+set_property(GLOBAL PROPERTY JOB_POOLS interrogate_csharp_finalize=1)
+
 set(IMOD_FLAGS -python-native)
 
 # This stores the names of every module added to the Interrogate system:
@@ -280,6 +282,289 @@ function(interrogate_sources target output database language_flags)
     COMPILE_DEFINITIONS "$<TARGET_PROPERTY:${target},INTERFACE_COMPILE_DEFINITIONS>")
 
 endfunction(interrogate_sources)
+
+# ---------------------------------------------------------------------------
+# C# binding generation
+# ---------------------------------------------------------------------------
+
+# Global property accumulating library>module mappings across all modules.
+define_property(GLOBAL PROPERTY INTERROGATE_LIB_MODULE_MAP
+  BRIEF_DOCS "library=module pairs for cross-module type resolution"
+  FULL_DOCS  "Populated by add_csharp_module, consumed by _interrogate_csharp_pass2")
+set_property(GLOBAL PROPERTY INTERROGATE_LIB_MODULE_MAP "")
+
+# Internal: invoke interrogate_csharp (pass 2) to emit .cs files for one module.
+function(_interrogate_csharp_pass2 module stamp dllname module_databases)
+  get_filename_component(stamp_directory "${stamp}" DIRECTORY)
+
+  # Derive a per-module output subdirectory from the module name.
+  # "panda3d.core" -> "Core", "panda3d.egg" -> "Egg", etc.
+  string(REGEX REPLACE "^.*\\." "" _module_suffix "${module}")
+  string(SUBSTRING "${_module_suffix}" 0 1 _first_char)
+  string(TOUPPER "${_first_char}" _first_upper)
+  string(SUBSTRING "${_module_suffix}" 1 -1 _rest_chars)
+  set(_module_subdir "${_first_upper}${_rest_chars}")
+  set(_cs_output_dir "${CSHARP_OUTPUT_DIR}/${_module_subdir}")
+
+  get_property(_lib_module_map GLOBAL PROPERTY INTERROGATE_LIB_MODULE_MAP)
+  set(_module_map_flags "")
+  foreach(_entry ${_lib_module_map})
+    list(APPEND _module_map_flags "--module-map" "${_entry}")
+  endforeach()
+
+  # Pass each .in file's basename as a separate --library flag so that
+  # interrogate_csharp can correctly identify which types are "owned" by this
+  # module.
+  set(_library_flags "")
+  foreach(_infile ${module_databases})
+    get_filename_component(_lib_name "${_infile}" NAME_WE)
+    list(APPEND _library_flags "--library" "${_lib_name}")
+  endforeach()
+
+  add_custom_command(
+    OUTPUT "${stamp}"
+    JOB_POOL interrogate_csharp_finalize
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${stamp_directory}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${_cs_output_dir}"
+    COMMAND interrogate_csharp
+      --module "${module}"
+      ${_library_flags}
+      --dllname "${dllname}"
+      --ocs "${_cs_output_dir}"
+      --search-dir "${CMAKE_BINARY_DIR}/cmake"
+      ${_module_map_flags}
+      ${module_databases}
+    COMMAND ${CMAKE_COMMAND} -E touch "${stamp}"
+    COMMAND_EXPAND_LISTS
+    DEPENDS ${module_databases}
+    COMMENT "Generating final C# bindings for ${module}")
+endfunction()
+
+# add_csharp_module(panda3d.core target1 target2 ... [LINK metalib] [DLLNAME name])
+#
+# Assembles C# bindings for a module.  Each target must have been processed by
+# target_interrogate first.  This function:
+#   1. Generates .in databases and supplemental .cxx stubs for each target
+#   2. Adds the supplemental native sources to the metalib
+#   3. Runs interrogate_csharp (pass 2) to emit .cs files
+#   4. Registers library>module mappings for cross-module resolution
+#
+function(add_csharp_module module)
+  if(NOT INTERROGATE_CSHARP_INTERFACE)
+    return()
+  endif()
+
+  set(targets)
+  set(link_targets)
+  set(dllname "")
+  set(keyword)
+
+  foreach(arg ${ARGN})
+    if(arg STREQUAL "LINK")
+      set(keyword "LINK")
+    elseif(arg STREQUAL "DLLNAME")
+      set(keyword "DLLNAME")
+    elseif(keyword STREQUAL "LINK")
+      list(APPEND link_targets "${arg}")
+      set(keyword)
+    elseif(keyword STREQUAL "DLLNAME")
+      set(dllname "${arg}")
+      set(keyword)
+    else()
+      list(APPEND targets "${arg}")
+    endif()
+  endforeach()
+
+  if(NOT link_targets)
+    set(link_targets ${targets})
+  endif()
+
+  # Derive the library name for [LibraryImport] from the first metalib target.
+  # The cmake target name matches the native library name on every platform
+  # (e.g. "panda" -> libpanda.so / panda.dll / libpanda.dylib).
+  if(NOT dllname AND link_targets)
+    list(GET link_targets 0 dllname)
+  endif()
+
+  # Derive per-module C# output subdirectory: "panda3d.egg" -> "Egg", etc.
+  string(REGEX REPLACE "^.*\\." "" _module_suffix "${module}")
+  string(SUBSTRING "${_module_suffix}" 0 1 _first_char)
+  string(TOUPPER "${_first_char}" _first_upper)
+  string(SUBSTRING "${_module_suffix}" 1 -1 _rest_chars)
+  set(_cs_output_dir "${CSHARP_OUTPUT_DIR}/${_first_upper}${_rest_chars}")
+
+  set(infiles_abs)
+  set(sources_abs)
+
+  foreach(target ${targets})
+    if(NOT TARGET ${target})
+      continue()
+    endif()
+
+    get_target_property(workdir_abs "${target}" TARGET_BINDIR)
+    if(NOT workdir_abs)
+      set(workdir_abs "${CMAKE_CURRENT_BINARY_DIR}/${PANDA_CFG_INTDIR}")
+    endif()
+
+    get_target_property(target_module "${target}" IGATE_MODULE)
+    if(NOT target_module)
+      set(target_module "${module}")
+    endif()
+
+    set(_lang_flags "-module;${target_module}")
+    list(APPEND infiles_abs "${workdir_abs}/${target}.in")
+
+    # Generate the interrogate database (.in) and C# native stubs in one pass.
+    # The supplemental .cxx carries all needed C# adaptations (e.g. UTF-8<->wstring
+    # conversions) and is the only compiled output; the .in feeds interrogate_csharp
+    # pass 2 to produce the managed .cs files once we have a complete picture of all
+    # classes and where they're defined.
+    set(_supplemental "${workdir_abs}/${target}_csharp_supplemental.cxx")
+
+    interrogate_csharp_native_sources(${target} "${_supplemental}" "${workdir_abs}/${target}.in" "${_lang_flags}" "${_cs_output_dir}")
+
+    list(APPEND sources_abs "${_supplemental}")
+
+    # Record library>module mapping
+    set_property(GLOBAL APPEND PROPERTY INTERROGATE_LIB_MODULE_MAP "${target}=${module}")
+  endforeach()
+
+  # Run interrogate_csharp (pass 2) to generate .cs files
+  set(_stamp "${CSHARP_OUTPUT_DIR}/${module}.csharp.stamp")
+  _interrogate_csharp_pass2("${module}" "${_stamp}" "${dllname}" "${infiles_abs}")
+
+  if(NOT TARGET csharp_bindings)
+    add_custom_target(csharp_bindings)
+  endif()
+  add_custom_target(${module}_csharp_igate DEPENDS ${infiles_abs} ${sources_abs} ${_stamp})
+  add_dependencies(csharp_bindings ${module}_csharp_igate)
+
+  if(link_targets AND sources_abs)
+    list(GET link_targets 0 _metalib)
+    if(TARGET ${_metalib})
+      foreach(_src ${sources_abs})
+        set_source_files_properties("${_src}" TARGET_DIRECTORY ${_metalib}
+          PROPERTIES GENERATED TRUE SKIP_UNITY_BUILD_INCLUSION YES)
+      endforeach()
+      target_sources(${_metalib} PRIVATE ${sources_abs})
+      target_include_directories(${_metalib} PRIVATE
+        "${PROJECT_SOURCE_DIR}/dtool/src/interrogatedb")
+      add_dependencies(${_metalib} ${module}_csharp_igate)
+      message(STATUS "C# module ${module}: supplemental sources added to ${_metalib}")
+    else()
+      message(WARNING "C# module ${module}: metalib ${_metalib} is not a target")
+    endif()
+  endif()
+endfunction()
+
+function(interrogate_csharp_native_sources target output database language_flags cs_output_dir)
+  get_target_property(sources "${target}" IGATE_SOURCES)
+  get_target_property(extensions "${target}" IGATE_EXTENSIONS)
+
+  if(NOT sources)
+    message(FATAL_ERROR
+      "Cannot interrogate ${target} unless it's run through target_interrogate first!")
+  endif()
+
+  get_target_property(srcdir "${target}" TARGET_SRCDIR)
+  if(NOT srcdir)
+    set(srcdir "${CMAKE_CURRENT_BINARY_DIR}")
+  endif()
+
+  set(scan_sources)
+  set(nfiles)
+  foreach(source ${sources})
+    get_filename_component(source_basename "${source}" NAME)
+    set(exclude OFF)
+    foreach(regex ${INTERROGATE_EXCLUDE_REGEXES})
+      if("${source_basename}" MATCHES "${regex}")
+        set(exclude ON)
+      endif()
+    endforeach()
+
+    if(NOT exclude)
+      file(RELATIVE_PATH rel_source "${srcdir}" "${source}")
+      list(APPEND scan_sources "${rel_source}")
+
+      get_filename_component(source_path "${source}" PATH)
+      get_filename_component(source_name_we "${source}" NAME_WE)
+      set(nfile "${source_path}/${source_name_we}.N")
+      if(EXISTS "${nfile}")
+        list(APPEND nfiles "${nfile}")
+      endif()
+    endif()
+  endforeach()
+
+  foreach(extension ${extensions})
+    file(RELATIVE_PATH rel_extension "${srcdir}" "${extension}")
+    list(APPEND scan_sources "${rel_extension}")
+  endforeach()
+
+  add_custom_target(${target}_csharp_supplemental_internal)
+  set_target_properties(${target}_csharp_supplemental_internal PROPERTIES
+    IS_INTERROGATE 1
+    INTERFACE_INCLUDE_DIRECTORIES "$<TARGET_PROPERTY:${target},INTERFACE_INCLUDE_DIRECTORIES>")
+
+  set(include_flags "-I$<JOIN:$<TARGET_PROPERTY:${target}_csharp_supplemental_internal,INTERFACE_INCLUDE_DIRECTORIES>,	-I>")
+
+  set(_compile_defs "$<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>")
+  if(NOT CMAKE_HOST_WIN32)
+    set(_q "'")
+  endif()
+  set(_compile_defs_flags "-D${_q}$<JOIN:${_compile_defs},${_q}	-D${_q}>${_q}")
+  set(define_flags
+    "$<$<NOT:$<STREQUAL:${_compile_defs_flags},-D${_q}${_q}>>:${_compile_defs_flags}>")
+
+  set(_configs ${CMAKE_CONFIGURATION_TYPES} ${CMAKE_BUILD_TYPE} "<ALL>")
+  list(REMOVE_DUPLICATES _configs)
+  foreach(_config ${_configs})
+    if(_config STREQUAL "<ALL>")
+      set(flags "${CMAKE_CXX_FLAGS}")
+    else()
+      string(TOUPPER "${_config}" _CONFIG)
+      set(flags "${CMAKE_CXX_FLAGS_${_CONFIG}}")
+    endif()
+
+    string(REGEX MATCHALL "[/-]D[ 	]*[A-Za-z0-9_]+" igate_flags "${flags}")
+    string(REPLACE ";" " " igate_flags "${igate_flags}")
+    string(REPLACE "/D" "-D" igate_flags "${igate_flags}")
+
+    if(_config STREQUAL "<ALL>")
+      list(APPEND define_flags "${igate_flags}")
+    else()
+      list(APPEND define_flags "$<$<CONFIG:${_config}>:${igate_flags}>")
+    endif()
+  endforeach()
+
+  get_filename_component(output_directory "${output}" DIRECTORY)
+  get_filename_component(database_directory "${database}" DIRECTORY)
+  add_custom_command(
+    OUTPUT "${output}" "${database}"
+    JOB_POOL interrogate_csharp_finalize
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${output_directory}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${database_directory}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${cs_output_dir}"
+    COMMAND interrogate
+      -oc "${output}"
+      -od "${database}"
+      -ocs "${cs_output_dir}"
+      -srcdir "${srcdir}"
+      -library ${target}
+      ${INTERROGATE_OPTIONS}
+      ${IGATE_FLAGS}
+      ${language_flags}
+      ${define_flags}
+      --csharp
+      -S "${PROJECT_SOURCE_DIR}/dtool/src/interrogatedb"
+      -S "${PROJECT_SOURCE_DIR}/dtool/src/parser-inc"
+      ${include_flags}
+      ${scan_sources}
+    DEPENDS interrogate ${sources} ${extensions} ${nfiles}
+    COMMENT "Generating supplemental native C# stubs for ${target}")
+
+  set_source_files_properties("${output}" PROPERTIES
+    COMPILE_DEFINITIONS "$<TARGET_PROPERTY:${target},INTERFACE_COMPILE_DEFINITIONS>")
+endfunction()
 
 #
 # Function: add_python_module(module [lib1 [lib2 ...]] [LINK lib1 ...]

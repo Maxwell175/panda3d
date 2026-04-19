@@ -34,6 +34,12 @@ install(TARGETS p3direct
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   ARCHIVE COMPONENT DirectDevel)
 
+if(INTERROGATE_CSHARP_INTERFACE)
+  add_csharp_module(panda3d.direct
+    p3dcparser p3deadrec p3distributed p3interval
+    p3motiontrail p3showbase LINK p3direct)
+endif()
+
 if(HAVE_PYTHON)
   # Now for the Python side of everything
 

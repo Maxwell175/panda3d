@@ -8,6 +8,9 @@
 
 /* Define if we have Python installed.  */
 #cmakedefine HAVE_PYTHON
+
+/* Define if C# bindings are being generated. */
+#cmakedefine HAVE_CSHARP
 #cmakedefine USE_DEBUG_PYTHON
 /* Define if we have Python as a framework (Mac OS X).  */
 #cmakedefine PYTHON_FRAMEWORK

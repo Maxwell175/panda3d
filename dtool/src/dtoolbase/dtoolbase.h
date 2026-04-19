@@ -482,6 +482,11 @@ typedef struct _typeobject PyTypeObject;
 #define PY_MAKE_PROPERTY(property_name, ...)
 #define PY_MAKE_SEQ_PROPERTY(property_name, ...)
 #endif // HAVE_PYTHON
+#ifdef HAVE_CSHARP
+#define CSHARP_EXTENSION(x) __csharp_extension x
+#else
+#define CSHARP_EXTENSION(x)
+#endif // HAVE_CSHARP
 #else // CPPPARSER
 #define BEGIN_PUBLISH
 #define END_PUBLISH
@@ -498,6 +503,7 @@ typedef struct _typeobject PyTypeObject;
 #define PY_EXTEND(...)
 #define PY_MAKE_PROPERTY(property_name, ...)
 #define PY_MAKE_SEQ_PROPERTY(property_name, ...)
+#define CSHARP_EXTENSION(x)
 #endif // CPPPARSER
 
 /* These symbols are used in dtoolsymbols.h and pandasymbols.h. */

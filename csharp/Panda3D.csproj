@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <NoWarn>$(NoWarn);CS8981</NoWarn>
+    <PackageId>Panda3D</PackageId>
+    <Version>1.11.0</Version>
+    <Authors>Panda3D</Authors>
+    <Description>C# bindings for the Panda3D game engine.</Description>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/panda3d/panda3d</PackageProjectUrl>
+    <IsPackable>true</IsPackable>
+
+    <!--
+      Override these two properties when packing from CI:
+        dotnet pack -p:GeneratedSourcesDir=/path/to/build/csharp
+                    -p:RuntimesDir=/path/to/runtimes
+
+      Local defaults point to cmake-build-debug layout and a runtimes/
+      directory adjacent to this .csproj.
+    -->
+    <GeneratedSourcesDir Condition="'$(GeneratedSourcesDir)' == ''">../cmake-build-debug/csharp</GeneratedSourcesDir>
+    <RuntimesDir Condition="'$(RuntimesDir)' == ''">$(MSBuildThisFileDirectory)runtimes</RuntimesDir>
+
+    <!--
+      Set from CI: -p:InterrogateCoreVersion=1.0.*
+      Derived from the major.minor of the Interrogate.Core the bindings were
+      generated against, so consumers get compatible runtime base classes.
+      Defaults to * for local dev (project-reference path takes precedence anyway).
+    -->
+    <InterrogateCoreVersion Condition="'$(InterrogateCoreVersion)' == ''">*</InterrogateCoreVersion>
+  </PropertyGroup>
+
+  <!--
+    Interrogate.Core reference:
+      • Local dev   — ProjectReference if the interrogate repo is a sibling (../../interrogate/)
+      • CI / NuGet  — PackageReference pinned to the major.minor built against
+  -->
+  <ItemGroup Condition="Exists('../../interrogate/csharp/Interrogate.Core/Interrogate.Core.csproj')">
+    <ProjectReference Include="../../interrogate/csharp/Interrogate.Core/Interrogate.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('../../interrogate/csharp/Interrogate.Core/Interrogate.Core.csproj')">
+    <PackageReference Include="Interrogate.Core" Version="$(InterrogateCoreVersion)" />
+  </ItemGroup>
+
+  <!-- Generated C# sources (platform-independent, produced by interrogate_csharp) -->
+  <ItemGroup>
+    <Compile Include="$(GeneratedSourcesDir)/**/*.cs" LinkBase="Generated" />
+  </ItemGroup>
+
+  <!--
+    Native shared libraries — loaded at runtime via P/Invoke.
+    Glob patterns match only when the corresponding runtimes/ subtree exists,
+    so a partial assembly (e.g. during local dev with only Linux) still packs.
+  -->
+  <ItemGroup>
+    <None Include="$(RuntimesDir)/linux-x64/native/*.so"    Pack="true" PackagePath="runtimes/linux-x64/native/"  />
+    <None Include="$(RuntimesDir)/linux-x64/native/*.so.*"  Pack="true" PackagePath="runtimes/linux-x64/native/"  />
+    <None Include="$(RuntimesDir)/win-x64/native/*.dll"     Pack="true" PackagePath="runtimes/win-x64/native/"    />
+    <None Include="$(RuntimesDir)/osx-x64/native/*.dylib"   Pack="true" PackagePath="runtimes/osx-x64/native/"    />
+    <None Include="$(RuntimesDir)/osx-arm64/native/*.dylib" Pack="true" PackagePath="runtimes/osx-arm64/native/"  />
+  </ItemGroup>
+
+  <!--
+    Native static archives — consumed only by NativeAOT publishing.
+    Placed in the same runtimes/ paths; the .targets file selects them
+    when PublishAot=true.
+  -->
+  <ItemGroup>
+    <None Include="$(RuntimesDir)/linux-x64/native/*.a"     Pack="true" PackagePath="runtimes/linux-x64/native/"  />
+    <None Include="$(RuntimesDir)/win-x64/native/*.lib"     Pack="true" PackagePath="runtimes/win-x64/native/"    />
+    <None Include="$(RuntimesDir)/osx-x64/native/*.a"       Pack="true" PackagePath="runtimes/osx-x64/native/"    />
+    <None Include="$(RuntimesDir)/osx-arm64/native/*.a"     Pack="true" PackagePath="runtimes/osx-arm64/native/"  />
+  </ItemGroup>
+
+  <!-- MSBuild integration targets (transitive import into consuming projects) -->
+  <ItemGroup>
+    <None Include="Panda3D.NuGet.targets" Pack="true" PackagePath="buildTransitive/net8.0/Panda3D.targets" />
+  </ItemGroup>
+
+  <Import Project="Panda3D.targets" />
+</Project>

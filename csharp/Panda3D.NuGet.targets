@@ -1,0 +1,79 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    NativeAOT static linking.
+
+    Enumerates all static archives shipped in runtimes/$(RuntimeIdentifier)/native/
+    and registers each one as a NativeLibrary + DirectPInvoke entry, matching the
+    per-metalib [LibraryImport] names used by the generated bindings.  This covers
+    both panda3d's own archives and the bundled thirdparty static archives.
+
+    Platform naming conventions:
+      Linux / macOS : lib<name>.a  → DirectPInvoke "<name>"
+      Windows       : <name>.lib   → DirectPInvoke "<name>"
+  -->
+  <Target Name="_Panda3DDirectPInvoke" BeforeTargets="PrepareForBuild" Condition="'$(PublishAot)' == 'true'">
+
+    <PropertyGroup>
+      <_Panda3DNativeDir>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_Panda3DNativeDir>
+    </PropertyGroup>
+
+    <!-- Linux / macOS: lib<name>.a — strip the 3-char "lib" prefix -->
+    <ItemGroup Condition="!$([MSBuild]::IsOSPlatform(Windows))">
+      <_P3Lib Include="$(_Panda3DNativeDir)*.a" />
+      <NativeLibrary Include="@(_P3Lib)" />
+      <DirectPInvoke Include="$([System.String]::Copy('%(_P3Lib.Filename)').Substring(3))" />
+    </ItemGroup>
+
+    <!-- Windows: <name>.lib — Filename already matches the P/Invoke name -->
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(Windows))">
+      <_P3Lib Include="$(_Panda3DNativeDir)*.lib" />
+      <NativeLibrary Include="@(_P3Lib)" />
+      <DirectPInvoke Include="%(_P3Lib.Filename)" />
+    </ItemGroup>
+
+  </Target>
+
+  <!--
+    OS/system library dependencies for NativeAOT static linking.
+
+    All thirdparty deps (jpeg, png, openssl, bullet, ffmpeg, etc.) are bundled
+    as static archives in runtimes/<rid>/native/ and are automatically picked up
+    by the NativeLibrary glob above.  Only OS-provided libraries that cannot be
+    bundled are listed here.
+  -->
+
+  <!-- Linux: display system + C++ runtime -->
+  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Linux))' == 'true'">
+    <LinkerArg Include="-lGL" />
+    <LinkerArg Include="-lEGL" />
+    <LinkerArg Include="-lX11" />
+    <LinkerArg Include="-lXext" />
+    <LinkerArg Include="-lSM" />
+    <LinkerArg Include="-lICE" />
+    <LinkerArg Include="-ldl" />
+    <LinkerArg Include="-lm" />
+    <LinkerArg Include="-lstdc++" />
+    <LinkerArg Include="-lpthread" />
+  </ItemGroup>
+
+  <!-- macOS: system frameworks -->
+  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
+    <LinkerArg Include="-framework OpenGL" />
+    <LinkerArg Include="-framework Cocoa" />
+    <LinkerArg Include="-framework IOKit" />
+    <LinkerArg Include="-framework CoreVideo" />
+    <LinkerArg Include="-framework AudioUnit" />
+    <LinkerArg Include="-framework AudioToolbox" />
+    <LinkerArg Include="-framework CoreAudio" />
+  </ItemGroup>
+
+  <!-- Windows: system libs not auto-linked by the .NET NativeAOT toolchain -->
+  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Windows))' == 'true'">
+    <LinkerArg Include="opengl32.lib" />
+    <LinkerArg Include="winmm.lib" />
+    <LinkerArg Include="ws2_32.lib" />
+    <LinkerArg Include="crypt32.lib" />
+  </ItemGroup>
+
+</Project>
