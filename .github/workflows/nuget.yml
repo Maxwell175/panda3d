@@ -116,9 +116,17 @@ jobs:
       - name: Install build tools (macOS)
         if: runner.os == 'macOS'
         run: |
-          curl -fsSL https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-mac.zip -o /tmp/ninja.zip
+          NINJA_VER=1.12.1
+          CMAKE_VER=3.29.6
+          curl -fsSL "https://github.com/ninja-build/ninja/releases/download/v${NINJA_VER}/ninja-mac.zip" \
+            -o /tmp/ninja.zip
           sudo unzip -o /tmp/ninja.zip -d /usr/local/bin ninja
           sudo chmod +x /usr/local/bin/ninja
+          curl -fsSL "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VER}/cmake-${CMAKE_VER}-macos-universal.tar.gz" \
+            -o /tmp/cmake.tar.gz
+          tar xzf /tmp/cmake.tar.gz -C /tmp
+          sudo mv "/tmp/cmake-${CMAKE_VER}-macos-universal/CMake.app" /Applications/CMake.app
+          echo "/Applications/CMake.app/Contents/bin" >> "$GITHUB_PATH"
           sudo rm -rf /opt/homebrew
 
       - name: Install build tools (Windows)
