@@ -727,14 +727,6 @@ package_option(HarfBuzz
 
 package_status(HarfBuzz "HarfBuzz")
 
-# HarfBuzz in panda3d-thirdparty is built with FreeType support but its cmake
-# config does not declare freetype as a transitive dep, so static
-# libharfbuzz.a consumers get unresolved FT_* references.  Inject it here.
-if(HAVE_HARFBUZZ AND HAVE_FREETYPE)
-  set_property(TARGET PKG::HARFBUZZ APPEND PROPERTY
-    INTERFACE_LINK_LIBRARIES PKG::FREETYPE)
-endif()
-
 # GTK3
 
 if(NOT WIN32)
