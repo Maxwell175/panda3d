@@ -116,9 +116,10 @@ jobs:
       - name: Install build tools (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install ninja bison flex
-          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
-          echo "$(brew --prefix flex)/bin"  >> "$GITHUB_PATH"
+          curl -fsSL https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-mac.zip -o /tmp/ninja.zip
+          sudo unzip -o /tmp/ninja.zip -d /usr/local/bin ninja
+          sudo chmod +x /usr/local/bin/ninja
+          sudo rm -rf /opt/homebrew
 
       - name: Install build tools (Windows)
         if: runner.os == 'Windows'
@@ -147,8 +148,7 @@ jobs:
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
             -DHAVE_PYTHON=NO \
-            -DBUILD_METALIBS=YES \
-            -DCMAKE_IGNORE_PREFIX_PATH=/opt/homebrew
+            -DBUILD_METALIBS=YES
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
