@@ -466,7 +466,11 @@ set(_PREV_WANT_PYTHON_VERSION "${WANT_PYTHON_VERSION}" CACHE INTERNAL "Internal.
 #
 
 # OpenSSL
-find_package(OpenSSL COMPONENTS SSL Crypto QUIET)
+# Force MODULE mode so cmake uses FindOpenSSL.cmake and respects OpenSSL_ROOT
+# via CMP0074.  Without MODULE, cmake tries config mode first and can find a
+# system OpenSSLConfig.cmake (e.g. Homebrew on macOS arm64) before ever
+# looking in the thirdparty directory — which then produces a wrong-arch lib.
+find_package(OpenSSL MODULE COMPONENTS SSL Crypto QUIET)
 
 # OpenSSL's cmake config (and CMake's own FindOpenSSL) do not declare the
 # Windows system library deps needed when linking against static libcrypto.lib.
@@ -722,6 +726,14 @@ package_option(HarfBuzz
   IMPORTED_AS harfbuzz::harfbuzz)
 
 package_status(HarfBuzz "HarfBuzz")
+
+# HarfBuzz in panda3d-thirdparty is built with FreeType support but its cmake
+# config does not declare freetype as a transitive dep, so static
+# libharfbuzz.a consumers get unresolved FT_* references.  Inject it here.
+if(TARGET harfbuzz::harfbuzz AND HAVE_FREETYPE)
+  set_property(TARGET harfbuzz::harfbuzz APPEND PROPERTY
+    INTERFACE_LINK_LIBRARIES PKG::FREETYPE)
+endif()
 
 # GTK3
 

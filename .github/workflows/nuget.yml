@@ -110,7 +110,8 @@ jobs:
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
             -DHAVE_PYTHON=NO \
-            -DBUILD_METALIBS=YES
+            -DBUILD_METALIBS=YES \
+            -DHAVE_TINYDISPLAY=OFF
 
       - name: Configure (macOS)
         if: runner.os == 'macOS'
@@ -123,7 +124,8 @@ jobs:
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
             -DHAVE_PYTHON=NO \
-            -DBUILD_METALIBS=YES
+            -DBUILD_METALIBS=YES \
+            -DHAVE_TINYDISPLAY=OFF
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
@@ -133,6 +135,7 @@ jobs:
             -G "Visual Studio 17 2022" -A x64 `
             "-DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }}" `
             -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
+            -DHAVE_MIMALLOC=OFF `
             -DINTERROGATE_CSHARP_INTERFACE=ON `
             -DBUILD_INTERROGATE=ON `
             -DHAVE_PYTHON=NO `
