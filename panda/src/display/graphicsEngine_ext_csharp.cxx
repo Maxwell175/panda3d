@@ -19,7 +19,14 @@ extern EXPCL_PANDA_MOVIES void init_libmovies();
 extern "C" EXPCL_PANDA_PNMIMAGETYPES void init_libpnmimagetypes();
 
 #ifdef HAVE_EGG
+// pandaegg is not linked by all consumers of libpanda (e.g. pandatool executables).
+// Declare weak so the linker does not error when it is absent; the null check below
+// guards the call.
+#if defined(__GNUC__) || defined(__clang__)
+extern void init_libpandaegg() __attribute__((weak));
+#else
 extern void init_libpandaegg();
+#endif
 #endif
 
 static bool _static_initialized = false;
@@ -43,7 +50,13 @@ static void ensure_static_init() {
   init_libpnmimagetypes();
 
 #ifdef HAVE_EGG
+#if defined(__GNUC__) || defined(__clang__)
+  if (init_libpandaegg != nullptr) {
+    init_libpandaegg();
+  }
+#else
   init_libpandaegg();
+#endif
 #endif
 }
 
