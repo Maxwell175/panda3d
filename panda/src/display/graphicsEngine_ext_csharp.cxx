@@ -22,7 +22,9 @@ extern "C" EXPCL_PANDA_PNMIMAGETYPES void init_libpnmimagetypes();
 // pandaegg is not linked by all consumers of libpanda (e.g. pandatool executables).
 // Declare weak so the linker does not error when it is absent; the null check below
 // guards the call.
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(__APPLE__)
+extern void init_libpandaegg() __attribute__((weak_import));
+#elif defined(__GNUC__) || defined(__clang__)
 extern void init_libpandaegg() __attribute__((weak));
 #else
 extern void init_libpandaegg();
