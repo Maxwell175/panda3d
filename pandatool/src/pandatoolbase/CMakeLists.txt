@@ -20,12 +20,8 @@ composite_sources(p3pandatoolbase P3PANDATOOLBASE_SOURCES)
 add_library(p3pandatoolbase STATIC ${P3PANDATOOLBASE_HEADERS} ${P3PANDATOOLBASE_SOURCES})
 target_link_libraries(p3pandatoolbase panda)
 
-# In static builds, graphicsPipeSelection.cxx (part of panda) directly
-# references get_pipe_type_* symbols from display pipe modules. Any final
-# executable that links panda must also link those modules so the linker
-# can resolve these symbols. Adding them here propagates the dependency
-# to all pandatool executables via p3pandatoolbase's public link chain.
-if(NOT BUILD_SHARED_LIBS)
+# Windows doesn't have weak linking so we must link here.
+if(NOT BUILD_SHARED_LIBS AND MSVC)
   if(HAVE_GL)
     target_link_libraries(p3pandatoolbase pandagl)
   endif()

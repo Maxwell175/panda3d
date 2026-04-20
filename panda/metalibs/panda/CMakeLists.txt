@@ -42,13 +42,6 @@ if(UNIX AND NOT APPLE AND NOT BUILD_SHARED_LIBS)
     endif()
   endif()
 
-  if(HAVE_GL)
-    list(APPEND _group_libs "$<TARGET_FILE:pandagl>")
-  endif()
-  if(HAVE_TINYDISPLAY)
-    list(APPEND _group_libs "$<TARGET_FILE:p3tinydisplay>")
-  endif()
-
   if(_group_libs)
     set_property(TARGET panda APPEND PROPERTY INTERFACE_LINK_LIBRARIES
       "-Wl,--start-group" ${_group_libs} "-Wl,--end-group"

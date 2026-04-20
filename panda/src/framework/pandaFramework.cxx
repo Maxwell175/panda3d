@@ -39,6 +39,47 @@
 
 extern "C" EXPCL_PANDA_PNMIMAGETYPES void init_libpnmimagetypes();
 
+#ifdef LINK_ALL_STATIC
+#if defined(HAVE_GL)
+extern void init_libpandagl();
+#endif
+#if defined(HAVE_DX9)
+extern void init_libpandadx9();
+#endif
+#if defined(HAVE_TINYDISPLAY)
+extern void init_libtinydisplay();
+#endif
+extern EXPCL_PANDA_CHAR void init_libchar();
+#ifdef HAVE_EGG
+extern void init_libpandaegg();
+#endif
+#endif
+
+extern "C" EXPCL_FRAMEWORK void
+p3framework_static_init() {
+  static bool initialized = false;
+  if (initialized) return;
+  initialized = true;
+
+#ifdef LINK_ALL_STATIC
+#if defined(HAVE_GL)
+  init_libpandagl();
+#endif
+#if defined(HAVE_DX9)
+  init_libpandadx9();
+#endif
+#if defined(HAVE_TINYDISPLAY)
+  init_libtinydisplay();
+#endif
+  init_libchar();
+#ifdef HAVE_EGG
+  init_libpandaegg();
+#endif
+#endif
+
+  init_libpnmimagetypes();
+}
+
 using std::string;
 
 #ifdef __EMSCRIPTEN__
@@ -105,35 +146,7 @@ open_framework() {
 
   _is_open = true;
 
-#ifdef LINK_ALL_STATIC
-  // If we're statically linking, we need to explicitly link with at least one
-  // of the available renderers.
-  #if defined(HAVE_GL)
-  extern void init_libpandagl();
-  init_libpandagl();
-  #endif
-  #if defined(HAVE_DX9)
-  extern EXPCL_PANDADX void init_libpandadx9();
-  init_libpandadx9();
-  #endif
-  #if defined(HAVE_TINYDISPLAY)
-  extern EXPCL_TINYDISPLAY void init_libtinydisplay();
-  init_libtinydisplay();
-  #endif
-
-  // Ensure the animation subsystem is available.
-  extern EXPCL_PANDA_CHAR void init_libchar();
-  init_libchar();
-
-  // We also want the egg loader.
-  #ifdef HAVE_EGG
-  init_libpandaegg();
-  #endif
-#endif
-
-  // Let's explicitly make a call to the image type library to ensure it gets
-  // pulled in by the dynamic linker.
-  init_libpnmimagetypes();
+  p3framework_static_init();
 
   reset_frame_rate();
 

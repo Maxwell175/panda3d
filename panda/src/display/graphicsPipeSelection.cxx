@@ -23,14 +23,23 @@
 #include <algorithm>
 
 #ifdef LINK_ALL_STATIC
+// Declare renderer pipe-type functions with weak link stubs...
 #if defined(HAVE_DX9)
 extern "C" int get_pipe_type_pandadx9();
 #endif
 #if defined(HAVE_GL)
+#if defined(__GNUC__) || defined(__clang__)
+extern "C" __attribute__((weak)) int get_pipe_type_pandagl() { return 0; }
+#else
 extern "C" int get_pipe_type_pandagl();
 #endif
+#endif
 #if defined(HAVE_TINYDISPLAY)
+#if defined(__GNUC__) || defined(__clang__)
+extern "C" __attribute__((weak)) int get_pipe_type_p3tinydisplay() { return 0; }
+#else
 extern "C" int get_pipe_type_p3tinydisplay();
+#endif
 #endif
 #endif
 

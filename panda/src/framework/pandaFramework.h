@@ -221,4 +221,10 @@ private:
 
 #include "pandaFramework.I"
 
+// Callable from C# via [DllImport("p3framework")]: initializes all statically
+// linked subsystems (renderers, image types, etc.).  No-op on repeated calls.
+// In shared builds only initializes image types; renderers self-register via
+// DSO static constructors.
+extern "C" EXPCL_FRAMEWORK void p3framework_static_init();
+
 #endif

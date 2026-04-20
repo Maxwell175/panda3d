@@ -5,11 +5,16 @@ using System.Runtime.InteropServices;
 
 namespace Panda3D.Core {
     internal static class NativeResolver {
+        [DllImport("p3framework", EntryPoint = "p3framework_static_init")]
+        private static extern void StaticInit();
+
 #pragma warning disable CA2255
         [ModuleInitializer]
 #pragma warning restore CA2255
         internal static void Initialize() {
             NativeLibrary.SetDllImportResolver(typeof(NativeResolver).Assembly, Resolve);
+            // Manually call initialization functions of all included subsystems in case this is a static build.
+            StaticInit();
         }
 
         private static IntPtr Resolve(string libraryName, Assembly assembly, DllImportSearchPath? searchPath) {
