@@ -107,7 +107,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            ninja-build bison flex \
+            ninja-build bison flex patchelf \
             libgl1-mesa-dev libegl1-mesa-dev \
             libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxext-dev \
             libsm-dev libice-dev
@@ -173,6 +173,10 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel 8
 
+      - name: Patch shared library metadata
+        if: runner.os != 'Windows' && matrix.link == 'shared'
+        run: python3 cmake/scripts/patch_native_libs.py build
+
       # Collect native libraries.
       # For static builds we also bundle thirdparty static archives so NativeAOT
       # consumers can link without any separately-installed packages.
@@ -184,7 +188,7 @@ jobs:
             find thirdparty/${{ matrix.thirdparty_dir }} -name "*.a" \
               -exec cp -n {} dist/ \; 2>/dev/null || true
           fi
-          find build -maxdepth 4 \( -name "*.so" -o -name "*.so.*" \) \
+          find build -maxdepth 4 -name "*.so" \
             ! -name "*igate*" ! -name "*supplemental*" \
             -exec cp -n {} dist/ \; 2>/dev/null || true
           find build -maxdepth 4 -name "*.a" \
@@ -201,6 +205,7 @@ jobs:
               -exec cp -n {} dist/ \; 2>/dev/null || true
           fi
           find build -maxdepth 4 -name "*.dylib" \
+            ! -name "*.[0-9]*.dylib" \
             ! -name "*igate*" ! -name "*supplemental*" \
             -exec cp -n {} dist/ \; 2>/dev/null || true
           find build -maxdepth 4 -name "*.a" \
