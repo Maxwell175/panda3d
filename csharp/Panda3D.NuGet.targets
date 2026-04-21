@@ -94,36 +94,32 @@
     <LinkerArg Include="crypt32.lib" />
   </ItemGroup>
 
-  <!-- Strip all panda3d native assets from the build output dir.
+  <!-- Strip static archives from the build output dir — they are never runtime artifacts.
+       Shared libs remain so dotnet run can load them via DllImport.
        GetFullPath resolves ../../ so the StartsWith comparison matches item FullPath metadata. -->
-  <Target Name="_Panda3DExcludeNativeAssetsFromBuildOutput"
+  <Target Name="_Panda3DExcludeStaticArchivesFromBuildOutput"
           AfterTargets="ResolvePackageAssets">
     <PropertyGroup>
       <_P3NativeDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/'))</_P3NativeDir>
     </PropertyGroup>
     <ItemGroup>
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-        Condition="$([System.String]::Copy('%(FullPath)').StartsWith('$(_P3NativeDir)'))" />
+        Condition="$([System.String]::Copy('%(FullPath)').StartsWith('$(_P3NativeDir)')) AND ('%(Extension)' == '.a' OR '%(Extension)' == '.lib')" />
     </ItemGroup>
   </Target>
 
-  <!-- Non-AOT publish: add shared libs back so DllImport can load them at runtime.
+  <!-- AOT publish: strip shared libs from the publish output — the binary is self-contained.
        Must run before _ComputeResolvedFilesToPublishTypes, which splits ResolvedFileToPublish
        into the item groups that the copy targets actually consume. -->
-  <Target Name="_Panda3DAddSharedLibsToPublish"
+  <Target Name="_Panda3DExcludeSharedLibsFromAotPublish"
           BeforeTargets="_ComputeResolvedFilesToPublishTypes"
-          Condition="'$(PublishAot)' != 'true'">
+          Condition="'$(PublishAot)' == 'true'">
     <PropertyGroup>
       <_P3NativeDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/'))</_P3NativeDir>
     </PropertyGroup>
     <ItemGroup>
-      <_P3SharedLib Include="$(_P3NativeDir)*.so" />
-      <_P3SharedLib Include="$(_P3NativeDir)*.dylib" />
-      <_P3SharedLib Include="$(_P3NativeDir)*.dll" Condition="$([MSBuild]::IsOSPlatform(Windows))" />
-      <ResolvedFileToPublish Include="@(_P3SharedLib)">
-        <RelativePath>%(Filename)%(Extension)</RelativePath>
-        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      </ResolvedFileToPublish>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="$([System.String]::Copy('%(FullPath)').StartsWith('$(_P3NativeDir)'))" />
     </ItemGroup>
   </Target>
 
