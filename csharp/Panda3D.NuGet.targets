@@ -1,31 +1,22 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
-  <!--
-    NativeAOT static linking.
-
-    Enumerates all static archives shipped in runtimes/$(RuntimeIdentifier)/native/
-    and registers each one as a NativeLibrary + DirectPInvoke entry, matching the
-    per-metalib [LibraryImport] names used by the generated bindings.  This covers
-    both panda3d's own archives and the bundled thirdparty static archives.
-
-    Platform naming conventions:
-      Linux / macOS : lib<name>.a  → DirectPInvoke "<name>"
-      Windows       : <name>.lib   → DirectPInvoke "<name>"
-  -->
+  <!-- NativeAOT: register every static archive as a DirectPInvoke entry.
+       Linux/macOS: lib<name>.a → "<name>".  Windows: <name>.lib → "<name>". -->
   <Target Name="_Panda3DDirectPInvoke" BeforeTargets="PrepareForBuild" Condition="'$(PublishAot)' == 'true'">
 
     <PropertyGroup>
       <_Panda3DNativeDir>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_Panda3DNativeDir>
     </PropertyGroup>
 
-    <!-- Linux / macOS: lib<name>.a — strip the 3-char "lib" prefix -->
     <ItemGroup Condition="!$([MSBuild]::IsOSPlatform(Windows))">
       <_P3Lib Include="$(_Panda3DNativeDir)*.a" />
-      <NativeLibrary Include="@(_P3Lib)" />
       <DirectPInvoke Include="$([System.String]::Copy('%(_P3Lib.Filename)').Substring(3))" />
     </ItemGroup>
 
-    <!-- Windows: <name>.lib — Filename already matches the P/Invoke name -->
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(OSX))">
+      <NativeLibrary Include="@(_P3Lib)" />
+    </ItemGroup>
+
     <ItemGroup Condition="$([MSBuild]::IsOSPlatform(Windows))">
       <_P3Lib Include="$(_Panda3DNativeDir)*.lib" />
       <NativeLibrary Include="@(_P3Lib)" />
@@ -34,16 +25,45 @@
 
   </Target>
 
-  <!--
-    OS/system library dependencies for NativeAOT static linking.
+  <!-- Linux: libpanda.a contains a weak stub for get_pipe_type_pandagl that returns 0.
+       whole-archive forces the strong definition from libpandagl.a to be included so
+       it overrides the stub.  libp3tinydisplay.a is excluded because it shares x11 base
+       symbols with libpandagl.a; force-loading both causes duplicate symbol errors.
+       start-group/end-group lets GNU ld make multiple passes for circular deps. -->
+  <Target Name="_Panda3DLinkerGroup" AfterTargets="SetupOSSpecificProps"
+          Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Linux))' == 'true'">
+    <PropertyGroup>
+      <_P3NativeDir>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_P3NativeDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_P3DisplayLib Include="$(_P3NativeDir)libpandagl.a" Condition="Exists('$(_P3NativeDir)libpandagl.a')" />
+      <LinkerArg Include="-Wl,--whole-archive" />
+      <LinkerArg Include="@(_P3DisplayLib)" />
+      <LinkerArg Include="-Wl,--no-whole-archive" />
+      <LinkerArg Include="-Wl,--start-group" />
+      <LinkerArg Include="@(_P3Lib)" />
+      <LinkerArg Include="-Wl,--end-group" />
+    </ItemGroup>
+  </Target>
 
-    All thirdparty deps (jpeg, png, openssl, bullet, ffmpeg, etc.) are bundled
-    as static archives in runtimes/<rid>/native/ and are automatically picked up
-    by the NativeLibrary glob above.  Only OS-provided libraries that cannot be
-    bundled are listed here.
-  -->
+  <!-- macOS: same weak-stub problem as Linux; -force_load is the Apple ld equivalent
+       of whole-archive.  SetupOSSpecificProps added libpandagl.a as a plain LinkerArg;
+       we swap it here for a -force_load one.  libp3tinydisplay.a shares p3cocoadisplay
+       symbols with libpandagl.a so it is left as a normal archive. -->
+  <Target Name="_Panda3DMacOSLinkerSetup" AfterTargets="SetupOSSpecificProps"
+          Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
+    <PropertyGroup>
+      <_P3NativeDirMac>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_P3NativeDirMac>
+    </PropertyGroup>
+    <ItemGroup>
+      <LinkerArg Remove="$(_P3NativeDirMac)libpandagl.a" />
+      <LinkerArg Include="-force_load $(_P3NativeDirMac)libpandagl.a"
+                 Condition="Exists('$(_P3NativeDirMac)libpandagl.a')" />
+    </ItemGroup>
+  </Target>
 
-  <!-- Linux: display system + C++ runtime -->
+  <!-- AOT system library dependencies — only OS libs that can't be bundled as static archives. -->
+
   <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Linux))' == 'true'">
     <LinkerArg Include="-lGL" />
     <LinkerArg Include="-lEGL" />
@@ -57,7 +77,6 @@
     <LinkerArg Include="-lpthread" />
   </ItemGroup>
 
-  <!-- macOS: system frameworks -->
   <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
     <LinkerArg Include="-framework OpenGL" />
     <LinkerArg Include="-framework Cocoa" />
@@ -68,12 +87,44 @@
     <LinkerArg Include="-framework CoreAudio" />
   </ItemGroup>
 
-  <!-- Windows: system libs not auto-linked by the .NET NativeAOT toolchain -->
   <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Windows))' == 'true'">
     <LinkerArg Include="opengl32.lib" />
     <LinkerArg Include="winmm.lib" />
     <LinkerArg Include="ws2_32.lib" />
     <LinkerArg Include="crypt32.lib" />
   </ItemGroup>
+
+  <!-- Strip all panda3d native assets from the build output dir.
+       GetFullPath resolves ../../ so the StartsWith comparison matches item FullPath metadata. -->
+  <Target Name="_Panda3DExcludeNativeAssetsFromBuildOutput"
+          AfterTargets="ResolvePackageAssets">
+    <PropertyGroup>
+      <_P3NativeDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/'))</_P3NativeDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+        Condition="$([System.String]::Copy('%(FullPath)').StartsWith('$(_P3NativeDir)'))" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Non-AOT publish: add shared libs back so DllImport can load them at runtime.
+       Must run before _ComputeResolvedFilesToPublishTypes, which splits ResolvedFileToPublish
+       into the item groups that the copy targets actually consume. -->
+  <Target Name="_Panda3DAddSharedLibsToPublish"
+          BeforeTargets="_ComputeResolvedFilesToPublishTypes"
+          Condition="'$(PublishAot)' != 'true'">
+    <PropertyGroup>
+      <_P3NativeDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/'))</_P3NativeDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_P3SharedLib Include="$(_P3NativeDir)*.so" />
+      <_P3SharedLib Include="$(_P3NativeDir)*.dylib" />
+      <_P3SharedLib Include="$(_P3NativeDir)*.dll" Condition="$([MSBuild]::IsOSPlatform(Windows))" />
+      <ResolvedFileToPublish Include="@(_P3SharedLib)">
+        <RelativePath>%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
 
 </Project>
