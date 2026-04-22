@@ -76,6 +76,8 @@
   <!-- MSBuild integration targets (transitive import into consuming projects) -->
   <ItemGroup>
     <None Include="Panda3D.NuGet.targets" Pack="true" PackagePath="buildTransitive/net8.0/Panda3D.targets" />
+    <!-- PRC config deployed alongside the .targets file so the copy target can find it -->
+    <None Include="$(MSBuildThisFileDirectory)etc/20_panda.prc" Pack="true" PackagePath="buildTransitive/net8.0/" />
   </ItemGroup>
 
   <Import Project="Panda3D.targets" />

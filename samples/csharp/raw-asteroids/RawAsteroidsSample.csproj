@@ -5,7 +5,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <StartupObject>Panda3D.RawAsteroids.AsteroidsGame</StartupObject>
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
-    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="etc/panda3d/*.prc" CopyToOutputDirectory="PreserveNewest" LinkBase="etc/panda3d" />
+    <Content Include="etc/*.prc" CopyToOutputDirectory="PreserveNewest" LinkBase="etc" />
   </ItemGroup>
 
 </Project>

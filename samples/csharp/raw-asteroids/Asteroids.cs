@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Interrogate;
 using Panda3D.Core;
 
@@ -23,9 +24,11 @@ namespace Panda3D.RawAsteroids {
     private const float RespawnDelay = 2.0f;
     private const float DegToRad = MathF.PI / 180.0f;
 
-    private const string AssetsRoot = "/home/maxwell/CLionProjects/panda3d/samples/asteroids";
-    private const string ModelsRoot = AssetsRoot + "/models";
-    private const string TexturesRoot = AssetsRoot + "/textures";
+    private static readonly string AssetsRoot =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "asteroids"))
+        .Replace('\\', '/');
+    private static readonly string ModelsRoot = AssetsRoot + "/models";
+    private static readonly string TexturesRoot = AssetsRoot + "/textures";
 
     private sealed class VelocityState {
       public float X;
