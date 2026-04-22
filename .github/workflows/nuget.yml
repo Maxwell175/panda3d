@@ -188,9 +188,15 @@ jobs:
             find thirdparty/${{ matrix.thirdparty_dir }} -name "*.a" \
               -exec cp -n {} dist/ \; 2>/dev/null || true
           fi
-          find build -maxdepth 4 -name "*.so" \
-            ! -name "*igate*" ! -name "*supplemental*" \
-            -exec cp -n {} dist/ \; 2>/dev/null || true
+          # Only shared builds provide .so files. Static builds still produce MODULE
+          # .so files (CMake MODULE libraries ignore BUILD_SHARED_LIBS), and those
+          # have panda code statically linked inside — they must not overwrite the
+          # shared-build versions that link against libpanda.so at runtime.
+          if [ "${{ matrix.link }}" = "shared" ]; then
+            find build -maxdepth 4 -name "*.so" \
+              ! -name "*igate*" ! -name "*supplemental*" \
+              -exec cp -n {} dist/ \; 2>/dev/null || true
+          fi
           find build -maxdepth 4 -name "*.a" \
             ! -name "*igate*" \
             -exec cp -n {} dist/ \; 2>/dev/null || true
@@ -204,10 +210,13 @@ jobs:
             find thirdparty/${{ matrix.thirdparty_dir }} -name "*.a" \
               -exec cp -n {} dist/ \; 2>/dev/null || true
           fi
-          find build -maxdepth 4 -name "*.dylib" \
-            ! -name "*.[0-9]*.dylib" \
-            ! -name "*igate*" ! -name "*supplemental*" \
-            -exec cp -n {} dist/ \; 2>/dev/null || true
+          # Only shared builds provide .dylib files (same reason as Linux above).
+          if [ "${{ matrix.link }}" = "shared" ]; then
+            find build -maxdepth 4 -name "*.dylib" \
+              ! -name "*.[0-9]*.dylib" \
+              ! -name "*igate*" ! -name "*supplemental*" \
+              -exec cp -n {} dist/ \; 2>/dev/null || true
+          fi
           find build -maxdepth 4 -name "*.a" \
             ! -name "*igate*" \
             -exec cp -n {} dist/ \; 2>/dev/null || true
@@ -222,9 +231,15 @@ jobs:
             Get-ChildItem -Recurse thirdparty\${{ matrix.thirdparty_dir }} -Filter '*.lib' |
               Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
           }
-          Get-ChildItem -Recurse build -Filter '*.dll' |
-            Where-Object { $_.Name -notmatch 'igate' } |
-            Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
+          # Only shared builds provide DLLs. Static builds still produce MODULE DLLs
+          # (CMake MODULE libraries ignore BUILD_SHARED_LIBS), and those have panda
+          # code statically linked inside — they must not overwrite the shared-build
+          # DLLs that load panda.dll at runtime.
+          if ("${{ matrix.link }}" -eq "shared") {
+            Get-ChildItem -Recurse build -Filter '*.dll' |
+              Where-Object { $_.Name -notmatch 'igate' } |
+              Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
+          }
           Get-ChildItem -Recurse build -Filter '*.lib' |
             Where-Object { $_.Name -notmatch 'igate' } |
             Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
