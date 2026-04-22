@@ -66,8 +66,8 @@ __pycache__/
 *.pyo
 
 # C# / .NET
-csharp/**/bin/
-csharp/**/obj/
+bin/
+obj/
 *.nupkg
 *.snupkg
 

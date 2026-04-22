@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <StartupObject>Panda3D.RawAsteroids.AsteroidsGame</StartupObject>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Panda3D" Version="1.11.0-preview.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="etc/panda3d/*.prc" CopyToOutputDirectory="PreserveNewest" LinkBase="etc/panda3d" />
+  </ItemGroup>
+
+</Project>
