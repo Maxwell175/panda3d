@@ -239,6 +239,9 @@ jobs:
             Get-ChildItem -Recurse build -Filter '*.dll' |
               Where-Object { $_.Name -notmatch 'igate' } |
               Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
+            if (Test-Path dist\pandaegg.dll) {
+              Copy-Item dist\pandaegg.dll dist\libpandaegg.dll
+            }
           }
           Get-ChildItem -Recurse build -Filter '*.lib' |
             Where-Object { $_.Name -notmatch 'igate' } |
