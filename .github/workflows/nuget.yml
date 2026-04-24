@@ -16,7 +16,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-24.04, windows-2022, macOS-15 ]
+        include:
+          - { os: ubuntu-24.04 }
+          - { os: macOS-15 }
+          - { os: windows-2022, crt: mt }
+          - { os: windows-2022, crt: md }
 
     runs-on: ${{ matrix.os }}
 
@@ -29,7 +33,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689_mt-${{ matrix.os }}
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.crt || 'default' }}-${{ matrix.os }}
 
       - name: Install yasm
         if: runner.os != 'Windows' && steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
@@ -40,7 +44,7 @@ jobs:
         run: git clone --revision=73384217d26c56aa9594e6d77c9b7c54f9c0d689 --depth=1 https://github.com/rdb/panda3d-thirdparty.git thirdparty
 
       - name: Patch thirdparty for MSVC /MT runtime
-        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true' && matrix.crt == 'mt'
         shell: bash
         run: git -C thirdparty apply ../.github/patches/thirdparty-msvc-mt.patch
 
@@ -92,6 +96,8 @@ jobs:
         include:
           - { os: ubuntu-24.04, rid: linux-x64,  thirdparty_dir: linux-libs-x64    }
           - { os: windows-2022, rid: win-x64,    thirdparty_dir: win-libs-vc14-x64 }
+          - { os: windows-2022, link: shared, thirdparty_crt: md }
+          - { os: windows-2022, link: static, thirdparty_crt: mt }
           - { os: macOS-15, link: shared, rid: osx-x64,   thirdparty_dir: darwin-libs-a, cmake_osx_arch: x86_64 }
           - { os: macOS-15, link: static, rid: osx-x64,   thirdparty_dir: darwin-libs-a, cmake_osx_arch: x86_64 }
           - { os: macOS-15, link: shared, rid: osx-arm64, thirdparty_dir: darwin-libs-a, cmake_osx_arch: arm64  }
@@ -107,7 +113,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689_mt-${{ matrix.os }}
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.thirdparty_crt || 'default' }}-${{ matrix.os }}
           fail-on-cache-miss: true
 
       - name: Install build tools (Linux)
@@ -172,7 +178,7 @@ jobs:
           cmake -B build `
             -G "Visual Studio 17 2022" -A x64 `
             "-DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }}" `
-            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
+            "-DCMAKE_MSVC_RUNTIME_LIBRARY=${{ matrix.link == 'static' && 'MultiThreaded' || 'MultiThreadedDLL' }}" `
             -DHAVE_MIMALLOC=OFF `
             -DINTERROGATE_CSHARP_INTERFACE=ON `
             -DBUILD_INTERROGATE=ON `
