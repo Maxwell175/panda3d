@@ -21,12 +21,15 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Restore thirdparty build cache
         id: cache-thirdparty-restore
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689_-${{ matrix.os }}
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689_mt-${{ matrix.os }}
 
       - name: Install yasm
         if: runner.os != 'Windows' && steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
@@ -35,6 +38,11 @@ jobs:
       - name: Clone thirdparty repository
         if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
         run: git clone --revision=73384217d26c56aa9594e6d77c9b7c54f9c0d689 --depth=1 https://github.com/rdb/panda3d-thirdparty.git thirdparty
+
+      - name: Patch thirdparty for MSVC /MT runtime
+        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true' && runner.os == 'Windows'
+        shell: bash
+        run: git -C thirdparty apply ../.github/patches/thirdparty-msvc-mt.patch
 
       - name: Configure
         if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
@@ -99,7 +107,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689_-${{ matrix.os }}
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689_mt-${{ matrix.os }}
           fail-on-cache-miss: true
 
       - name: Install build tools (Linux)
@@ -164,6 +172,7 @@ jobs:
           cmake -B build `
             -G "Visual Studio 17 2022" -A x64 `
             "-DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }}" `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
             -DHAVE_MIMALLOC=OFF `
             -DINTERROGATE_CSHARP_INTERFACE=ON `
             -DBUILD_INTERROGATE=ON `

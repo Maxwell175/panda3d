@@ -1,0 +1,30 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e4102a6..b0d131b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -150,6 +150,7 @@ set(COMMON_CMAKE_ARGS
+   -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+   -DCMAKE_LINKER=${CMAKE_LINKER}
+   -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
++  -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+   -DCMAKE_INSTALL_LIBDIR=lib
+   -DBUILD_SHARED_LIBS=OFF
+   -DSKIP_INSTALL_EXECUTABLES=ON
+@@ -304,7 +305,7 @@ if(BUILD_BULLET)
+ 
+     CMAKE_ARGS ${COMMON_CMAKE_ARGS}
+       -DINSTALL_LIBS=ON
+-      -DUSE_MSVC_RUNTIME_LIBRARY_DLL=ON
++      -DUSE_MSVC_RUNTIME_LIBRARY_DLL=OFF
+       -DBUILD_DEMOS=OFF
+       -DBUILD_CPU_DEMOS=OFF
+       -DBUILD_OPENGL3_DEMOS=OFF
+@@ -971,7 +972,7 @@ if(BUILD_SPIRV_CROSS)
+   set(spirv_cross_flags)
+   if(MSVC)
+     # Don't specify NDEBUG so we don't compile out the error messages
+-    set(spirv_cross_flags "-DCMAKE_CXX_FLAGS_RELEASE=/MD /O2 /Ob2")
++    set(spirv_cross_flags "-DCMAKE_CXX_FLAGS_RELEASE=/MT /O2 /Ob2")
+   endif()
+ 
+   ExternalProject_Add(
