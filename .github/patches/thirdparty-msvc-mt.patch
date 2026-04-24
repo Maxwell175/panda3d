@@ -10,7 +10,21 @@ index e4102a6..b0d131b 100644
    -DCMAKE_INSTALL_LIBDIR=lib
    -DBUILD_SHARED_LIBS=OFF
    -DSKIP_INSTALL_EXECUTABLES=ON
-@@ -304,7 +305,7 @@ if(BUILD_BULLET)
+@@ -156,6 +157,13 @@ set(COMMON_CMAKE_ARGS
+   -DSKIP_INSTALL_FILES=ON
+   -Wno-dev
+ )
++
++if(MSVC)
++  list(APPEND COMMON_CMAKE_ARGS
++    "-DCMAKE_CXX_FLAGS_RELEASE=/MT /O2 /Ob2 /DNDEBUG"
++    "-DCMAKE_C_FLAGS_RELEASE=/MT /O2 /Ob2 /DNDEBUG"
++  )
++endif()
+ 
+ if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+   set(COMMON_CMAKE_ARGS ${COMMON_CMAKE_ARGS}
+@@ -304,7 +312,7 @@ if(BUILD_BULLET)
  
      CMAKE_ARGS ${COMMON_CMAKE_ARGS}
        -DINSTALL_LIBS=ON
@@ -19,7 +33,7 @@ index e4102a6..b0d131b 100644
        -DBUILD_DEMOS=OFF
        -DBUILD_CPU_DEMOS=OFF
        -DBUILD_OPENGL3_DEMOS=OFF
-@@ -971,7 +972,7 @@ if(BUILD_SPIRV_CROSS)
+@@ -971,7 +979,7 @@ if(BUILD_SPIRV_CROSS)
    set(spirv_cross_flags)
    if(MSVC)
      # Don't specify NDEBUG so we don't compile out the error messages
@@ -28,3 +42,4 @@ index e4102a6..b0d131b 100644
    endif()
  
    ExternalProject_Add(
+ 
