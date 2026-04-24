@@ -243,9 +243,15 @@ jobs:
               Copy-Item dist\pandaegg.dll dist\libpandaegg.dll
             }
           }
-          Get-ChildItem -Recurse build -Filter '*.lib' |
-            Where-Object { $_.Name -notmatch 'igate' } |
-            Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
+          # Only pull *.lib files from static builds.
+          if ("${{ matrix.link }}" -eq "static") {
+            # Non-recursive: only the CMake archive output dir, not per-target
+            # OBJECT-library intermediates that duplicate
+            # the metalib archives.
+            Get-ChildItem build\Release\lib -Filter '*.lib' |
+              Where-Object { $_.Name -notmatch 'igate' } |
+              Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
+          }
           Get-ChildItem dist\
 
       - uses: actions/upload-artifact@v4

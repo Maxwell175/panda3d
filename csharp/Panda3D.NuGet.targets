@@ -1,7 +1,10 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
   <!-- NativeAOT: register every static archive as a DirectPInvoke entry.
-       Linux/macOS: lib<name>.a → "<name>".  Windows: <name>.lib → "<name>". -->
+       Linux/macOS: lib<name>.a  → strip "lib" prefix → DirectPInvoke name.
+       Windows:     lib<name>.lib → strip "lib" prefix → DirectPInvoke name,
+       matching the DllImport("panda"), DllImport("pandaegg") etc. in the C# bindings.
+       The Windows static build uses /MD (dynamic CRT), compatible with NativeAOT. -->
   <Target Name="_Panda3DDirectPInvoke" BeforeTargets="PrepareForBuild" Condition="'$(PublishAot)' == 'true'">
 
     <PropertyGroup>
@@ -18,9 +21,12 @@
     </ItemGroup>
 
     <ItemGroup Condition="$([MSBuild]::IsOSPlatform(Windows))">
+      <!-- All .lib files are static archives; link all to resolve the dependency chain. -->
       <_P3Lib Include="$(_Panda3DNativeDir)*.lib" />
       <NativeLibrary Include="@(_P3Lib)" />
-      <DirectPInvoke Include="%(_P3Lib.Filename)" />
+      <!-- Panda3D metalibs have a lib prefix; strip it to match DllImport("panda") etc. -->
+      <_P3MetaLib Include="$(_Panda3DNativeDir)lib*.lib" />
+      <DirectPInvoke Include="$([System.String]::Copy('%(_P3MetaLib.Filename)').Substring(3))" />
     </ItemGroup>
 
   </Target>
@@ -89,6 +95,10 @@
 
   <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Windows))' == 'true'">
     <LinkerArg Include="opengl32.lib" />
+    <LinkerArg Include="gdi32.lib" />
+    <LinkerArg Include="imm32.lib" />
+    <LinkerArg Include="setupapi.lib" />
+    <LinkerArg Include="shell32.lib" />
     <LinkerArg Include="winmm.lib" />
     <LinkerArg Include="ws2_32.lib" />
     <LinkerArg Include="crypt32.lib" />
@@ -140,7 +150,9 @@
     </ItemGroup>
   </Target>
 
-  <!-- AOT publish: strip shared libs from the publish output — the binary is self-contained.
+  <!-- AOT publish: strip all native files from the publish output.
+       All platforms — the AOT binary is fully self-contained; native archives
+       are link-time artifacts only and must not ship alongside the executable.
        Must run before _ComputeResolvedFilesToPublishTypes, which splits ResolvedFileToPublish
        into the item groups that the copy targets actually consume. -->
   <Target Name="_Panda3DExcludeSharedLibsFromAotPublish"
