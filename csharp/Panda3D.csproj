@@ -3,7 +3,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoWarn>$(NoWarn);CS8981</NoWarn>
-    <PackageId>Panda3D</PackageId>
+    <PackageId>Panda3D.Interop</PackageId>
     <Version>1.11.0</Version>
     <Authors>Panda3D</Authors>
     <Description>C# bindings for the Panda3D game engine.</Description>
@@ -75,7 +75,7 @@
 
   <!-- MSBuild integration targets (transitive import into consuming projects) -->
   <ItemGroup>
-    <None Include="Panda3D.NuGet.targets" Pack="true" PackagePath="buildTransitive/net8.0/Panda3D.targets" />
+    <None Include="Panda3D.NuGet.targets" Pack="true" PackagePath="buildTransitive/net8.0/Panda3D.Interop.targets" />
     <!-- PRC config deployed alongside the .targets file so the copy target can find it -->
     <None Include="$(MSBuildThisFileDirectory)etc/20_panda.prc" Pack="true" PackagePath="buildTransitive/net8.0/" />
   </ItemGroup>

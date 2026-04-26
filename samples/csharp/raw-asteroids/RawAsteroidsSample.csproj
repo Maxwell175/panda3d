@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Panda3D" Version="1.11.0-preview.*" />
+    <PackageReference Include="Panda3D.Interop" Version="1.11.0-preview.*" />
   </ItemGroup>
 
   <ItemGroup>
