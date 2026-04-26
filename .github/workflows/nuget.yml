@@ -156,7 +156,8 @@ jobs:
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
             -DHAVE_PYTHON=NO \
-            -DBUILD_METALIBS=YES
+            -DBUILD_METALIBS=YES \
+            -DDEFAULT_PRC_DIR="<auto>etc"
 
       - name: Configure (macOS)
         if: runner.os == 'macOS'
@@ -169,7 +170,8 @@ jobs:
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
             -DHAVE_PYTHON=NO \
-            -DBUILD_METALIBS=YES
+            -DBUILD_METALIBS=YES \
+            -DDEFAULT_PRC_DIR="<auto>etc"
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
@@ -183,7 +185,8 @@ jobs:
             -DINTERROGATE_CSHARP_INTERFACE=ON `
             -DBUILD_INTERROGATE=ON `
             -DHAVE_PYTHON=NO `
-            -DBUILD_METALIBS=YES
+            -DBUILD_METALIBS=YES `
+            '-DDEFAULT_PRC_DIR=<auto>etc'
 
       - name: Build
         run: cmake --build build --config Release --parallel 8

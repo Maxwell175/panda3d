@@ -86,11 +86,13 @@
   <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
     <LinkerArg Include="-framework OpenGL" />
     <LinkerArg Include="-framework Cocoa" />
+    <LinkerArg Include="-framework Carbon" />
     <LinkerArg Include="-framework IOKit" />
     <LinkerArg Include="-framework CoreVideo" />
     <LinkerArg Include="-framework AudioUnit" />
     <LinkerArg Include="-framework AudioToolbox" />
     <LinkerArg Include="-framework CoreAudio" />
+    <LinkerArg Include="-lc++" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Windows))' == 'true'">
