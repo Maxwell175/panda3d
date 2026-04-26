@@ -110,10 +110,7 @@
       <_P3EffectiveRid Condition="'$(_P3EffectiveRid)' == ''">$(NETCoreSdkRuntimeIdentifier)</_P3EffectiveRid>
     </PropertyGroup>
 
-    <!-- Generate <OutDir>etc/20_panda.prc with the rid-specific plugin-path baked in.
-         $THIS_PRC_DIR is a Panda3D variable (not MSBuild); MSBuild writes it literally. -->
     <ItemGroup Condition="'$(_P3EffectiveRid)' != ''">
-      <_P3PrcLines Include="plugin-path $THIS_PRC_DIR/../$(_P3EffectiveRid)" />
       <_P3PrcLines Include="load-display pandagl" />
       <_P3PrcLines Include="aux-display p3tinydisplay" />
       <_P3PrcLines Include="load-file-type egg pandaegg" />
@@ -125,15 +122,6 @@
       Overwrite="true"
       Condition="'$(_P3EffectiveRid)' != ''" />
 
-    <!-- Belt-and-suspenders: also place the PRC in the rid-specific etc/ for the case
-         where get_dtool_name() finds p3dtool.dll and searches from the DLL directory. -->
-    <PropertyGroup>
-      <_P3PrcFile>$(MSBuildThisFileDirectory)20_panda.prc</_P3PrcFile>
-    </PropertyGroup>
-    <Copy SourceFiles="$(_P3PrcFile)"
-          DestinationFolder="$(OutDir)$(_P3EffectiveRid)/etc"
-          SkipUnchangedFiles="true"
-          Condition="Exists('$(_P3PrcFile)') AND '$(_P3EffectiveRid)' != ''" />
   </Target>
 
   <!-- Strip static archives from the build output dir — they are never runtime artifacts.
@@ -148,6 +136,19 @@
       <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
         Condition="$([System.String]::Copy('%(FullPath)').StartsWith('$(_P3NativeDir)')) AND ('%(Extension)' == '.a' OR '%(Extension)' == '.lib')" />
     </ItemGroup>
+  </Target>
+
+  <!-- Copy the generated PRC config into the publish directory so the deployed
+       application can discover display modules and file-type loaders. -->
+  <Target Name="_Panda3DCopyPrcToPublish" AfterTargets="_Panda3DCopyPrcConfig"
+          Condition="'$(PublishDir)' != ''">
+    <ItemGroup>
+      <_P3PrcPublish Include="$(OutDir)etc/*.prc" />
+    </ItemGroup>
+    <MakeDir Directories="$(PublishDir)etc" Condition="@(_P3PrcPublish) != ''" />
+    <Copy SourceFiles="@(_P3PrcPublish)"
+          DestinationFolder="$(PublishDir)etc"
+          SkipUnchangedFiles="true" />
   </Target>
 
   <!-- AOT publish: strip all native files from the publish output.

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using Interrogate;
 using Panda3D.Core;
+
 
 namespace Panda3D.RawAsteroids {
   internal static class AsteroidsGame {
@@ -25,7 +27,7 @@ namespace Panda3D.RawAsteroids {
     private const float DegToRad = MathF.PI / 180.0f;
 
     private static readonly string AssetsRoot =
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "asteroids"))
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "asteroids"))
         .Replace('\\', '/');
     private static readonly string ModelsRoot = AssetsRoot + "/models";
     private static readonly string TexturesRoot = AssetsRoot + "/textures";
@@ -202,7 +204,8 @@ namespace Panda3D.RawAsteroids {
       Create2dLabel("right", "[Right Arrow]: Turn Right (CW)", -ar + 0.07f, 1.0f - 0.22f, 0.05f, TextProperties_Alignment.A_left);
       Create2dLabel("up", "[Up Arrow]: Accelerate", -ar + 0.07f, 1.0f - 0.28f, 0.05f, TextProperties_Alignment.A_left);
       Create2dLabel("space", "[Space Bar]: Fire", -ar + 0.07f, 1.0f - 0.34f, 0.05f, TextProperties_Alignment.A_left);
-      Create2dLabel("engine", "Panda3D C# \u2022 NativeAOT Static", -ar + 0.07f, 1.0f - 0.42f, 0.04f, TextProperties_Alignment.A_left);
+      string mode = RuntimeFeature.IsDynamicCodeCompiled ? "Shared" : "NativeAOT Static";
+      Create2dLabel("engine", $"Panda3D C# \u2022 {mode}", -ar + 0.07f, 1.0f - 0.42f, 0.04f, TextProperties_Alignment.A_left);
 
       statusText = new TextNode("status");
       FrameworkBindings.SetText(statusText, string.Empty);

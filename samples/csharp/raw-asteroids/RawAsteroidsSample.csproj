@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <Content Include="etc/*.prc" CopyToOutputDirectory="PreserveNewest" LinkBase="etc" />
+    <Content Include="../../asteroids/models/**" CopyToOutputDirectory="PreserveNewest" LinkBase="asteroids/models" />
+    <Content Include="../../asteroids/textures/**" CopyToOutputDirectory="PreserveNewest" LinkBase="asteroids/textures" />
   </ItemGroup>
 
 </Project>
