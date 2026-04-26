@@ -1,0 +1,126 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- NativeAOT: register static archives as DirectPInvoke entries and NativeLibrary items.
+       Each Panda3D.Runtime.{rid} package ships this targets file alongside its native libs.
+       Linux/macOS: lib<name>.a  → strip "lib" prefix → DirectPInvoke name.
+       Windows:     lib<name>.lib → strip "lib" prefix → DirectPInvoke name,
+       matching the DllImport("panda"), DllImport("pandaegg") etc. in the C# bindings. -->
+  <Target Name="_Panda3DRuntimeDirectPInvoke" BeforeTargets="PrepareForBuild" Condition="'$(PublishAot)' == 'true'">
+
+    <PropertyGroup>
+      <_P3NativeDir>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_P3NativeDir>
+    </PropertyGroup>
+
+    <ItemGroup Condition="!$([MSBuild]::IsOSPlatform(Windows))">
+      <_P3Lib Include="$(_P3NativeDir)*.a" />
+      <DirectPInvoke Include="$([System.String]::Copy('%(_P3Lib.Filename)').Substring(3))" />
+    </ItemGroup>
+
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(OSX))">
+      <NativeLibrary Include="@(_P3Lib)" />
+    </ItemGroup>
+
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(Windows))">
+      <_P3Lib Include="$(_P3NativeDir)*.lib" />
+      <NativeLibrary Include="@(_P3Lib)" />
+      <_P3MetaLib Include="$(_P3NativeDir)lib*.lib" />
+      <DirectPInvoke Include="$([System.String]::Copy('%(_P3MetaLib.Filename)').Substring(3))" />
+    </ItemGroup>
+
+  </Target>
+
+  <!-- Linux: --whole-archive for libpandagl.a to override weak get_pipe_type stubs.
+       --start-group/--end-group for circular deps between Panda3D archives. -->
+  <Target Name="_Panda3DLinkerGroup" AfterTargets="SetupOSSpecificProps"
+          Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Linux))' == 'true'">
+    <PropertyGroup>
+      <_P3NativeDir>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_P3NativeDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_P3DisplayLib Include="$(_P3NativeDir)libpandagl.a" Condition="Exists('$(_P3NativeDir)libpandagl.a')" />
+      <LinkerArg Include="-Wl,--whole-archive" />
+      <LinkerArg Include="@(_P3DisplayLib)" />
+      <LinkerArg Include="-Wl,--no-whole-archive" />
+      <LinkerArg Include="-Wl,--start-group" />
+      <LinkerArg Include="@(_P3Lib)" />
+      <LinkerArg Include="-Wl,--end-group" />
+    </ItemGroup>
+  </Target>
+
+  <!-- macOS: -force_load for libpandagl.a (Apple ld equivalent of --whole-archive). -->
+  <Target Name="_Panda3DMacOSLinkerSetup" AfterTargets="SetupOSSpecificProps"
+          Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
+    <PropertyGroup>
+      <_P3NativeDirMac>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_P3NativeDirMac>
+    </PropertyGroup>
+    <ItemGroup>
+      <LinkerArg Remove="$(_P3NativeDirMac)libpandagl.a" />
+      <LinkerArg Include="-force_load $(_P3NativeDirMac)libpandagl.a"
+                 Condition="Exists('$(_P3NativeDirMac)libpandagl.a')" />
+    </ItemGroup>
+  </Target>
+
+  <!-- AOT system library dependencies -->
+
+  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Linux))' == 'true'">
+    <LinkerArg Include="-lGL" />
+    <LinkerArg Include="-lEGL" />
+    <LinkerArg Include="-lX11" />
+    <LinkerArg Include="-lXext" />
+    <LinkerArg Include="-lSM" />
+    <LinkerArg Include="-lICE" />
+    <LinkerArg Include="-ldl" />
+    <LinkerArg Include="-lm" />
+    <LinkerArg Include="-lstdc++" />
+    <LinkerArg Include="-lpthread" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
+    <LinkerArg Include="-framework OpenGL" />
+    <LinkerArg Include="-framework Cocoa" />
+    <LinkerArg Include="-framework Carbon" />
+    <LinkerArg Include="-framework IOKit" />
+    <LinkerArg Include="-framework CoreVideo" />
+    <LinkerArg Include="-framework AudioUnit" />
+    <LinkerArg Include="-framework AudioToolbox" />
+    <LinkerArg Include="-framework CoreAudio" />
+    <LinkerArg Include="-lc++" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Windows))' == 'true'">
+    <LinkerArg Include="opengl32.lib" />
+    <LinkerArg Include="gdi32.lib" />
+    <LinkerArg Include="imm32.lib" />
+    <LinkerArg Include="setupapi.lib" />
+    <LinkerArg Include="shell32.lib" />
+    <LinkerArg Include="winmm.lib" />
+    <LinkerArg Include="ws2_32.lib" />
+    <LinkerArg Include="crypt32.lib" />
+  </ItemGroup>
+
+  <!-- Strip static archives from build output — they are link-time only. -->
+  <Target Name="_Panda3DExcludeStaticArchivesFromBuildOutput"
+          AfterTargets="ResolvePackageAssets">
+    <PropertyGroup>
+      <_P3NativeDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/'))</_P3NativeDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
+        Condition="$([System.String]::Copy('%(FullPath)').StartsWith('$(_P3NativeDir)')) AND ('%(Extension)' == '.a' OR '%(Extension)' == '.lib')" />
+    </ItemGroup>
+  </Target>
+
+  <!-- AOT publish: strip all native files — the binary is self-contained. -->
+  <Target Name="_Panda3DExcludeNativeFromAotPublish"
+          BeforeTargets="_ComputeResolvedFilesToPublishTypes"
+          Condition="'$(PublishAot)' == 'true'">
+    <PropertyGroup>
+      <_P3NativeDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/'))</_P3NativeDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="$([System.String]::Copy('%(FullPath)').StartsWith('$(_P3NativeDir)'))" />
+    </ItemGroup>
+  </Target>
+
+</Project>

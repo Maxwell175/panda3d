@@ -1,111 +1,9 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
-  <!-- NativeAOT: register every static archive as a DirectPInvoke entry.
-       Linux/macOS: lib<name>.a  → strip "lib" prefix → DirectPInvoke name.
-       Windows:     lib<name>.lib → strip "lib" prefix → DirectPInvoke name,
-       matching the DllImport("panda"), DllImport("pandaegg") etc. in the C# bindings.
-       The Windows static build uses /MD (dynamic CRT), compatible with NativeAOT. -->
-  <Target Name="_Panda3DDirectPInvoke" BeforeTargets="PrepareForBuild" Condition="'$(PublishAot)' == 'true'">
-
-    <PropertyGroup>
-      <_Panda3DNativeDir>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_Panda3DNativeDir>
-    </PropertyGroup>
-
-    <ItemGroup Condition="!$([MSBuild]::IsOSPlatform(Windows))">
-      <_P3Lib Include="$(_Panda3DNativeDir)*.a" />
-      <DirectPInvoke Include="$([System.String]::Copy('%(_P3Lib.Filename)').Substring(3))" />
-    </ItemGroup>
-
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(OSX))">
-      <NativeLibrary Include="@(_P3Lib)" />
-    </ItemGroup>
-
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(Windows))">
-      <!-- All .lib files are static archives; link all to resolve the dependency chain. -->
-      <_P3Lib Include="$(_Panda3DNativeDir)*.lib" />
-      <NativeLibrary Include="@(_P3Lib)" />
-      <!-- Panda3D metalibs have a lib prefix; strip it to match DllImport("panda") etc. -->
-      <_P3MetaLib Include="$(_Panda3DNativeDir)lib*.lib" />
-      <DirectPInvoke Include="$([System.String]::Copy('%(_P3MetaLib.Filename)').Substring(3))" />
-    </ItemGroup>
-
-  </Target>
-
-  <!-- Linux: libpanda.a contains a weak stub for get_pipe_type_pandagl that returns 0.
-       whole-archive forces the strong definition from libpandagl.a to be included so
-       it overrides the stub.  libp3tinydisplay.a is excluded because it shares x11 base
-       symbols with libpandagl.a; force-loading both causes duplicate symbol errors.
-       start-group/end-group lets GNU ld make multiple passes for circular deps. -->
-  <Target Name="_Panda3DLinkerGroup" AfterTargets="SetupOSSpecificProps"
-          Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Linux))' == 'true'">
-    <PropertyGroup>
-      <_P3NativeDir>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_P3NativeDir>
-    </PropertyGroup>
-    <ItemGroup>
-      <_P3DisplayLib Include="$(_P3NativeDir)libpandagl.a" Condition="Exists('$(_P3NativeDir)libpandagl.a')" />
-      <LinkerArg Include="-Wl,--whole-archive" />
-      <LinkerArg Include="@(_P3DisplayLib)" />
-      <LinkerArg Include="-Wl,--no-whole-archive" />
-      <LinkerArg Include="-Wl,--start-group" />
-      <LinkerArg Include="@(_P3Lib)" />
-      <LinkerArg Include="-Wl,--end-group" />
-    </ItemGroup>
-  </Target>
-
-  <!-- macOS: same weak-stub problem as Linux; -force_load is the Apple ld equivalent
-       of whole-archive.  SetupOSSpecificProps added libpandagl.a as a plain LinkerArg;
-       we swap it here for a -force_load one.  libp3tinydisplay.a shares p3cocoadisplay
-       symbols with libpandagl.a so it is left as a normal archive. -->
-  <Target Name="_Panda3DMacOSLinkerSetup" AfterTargets="SetupOSSpecificProps"
-          Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
-    <PropertyGroup>
-      <_P3NativeDirMac>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_P3NativeDirMac>
-    </PropertyGroup>
-    <ItemGroup>
-      <LinkerArg Remove="$(_P3NativeDirMac)libpandagl.a" />
-      <LinkerArg Include="-force_load $(_P3NativeDirMac)libpandagl.a"
-                 Condition="Exists('$(_P3NativeDirMac)libpandagl.a')" />
-    </ItemGroup>
-  </Target>
-
-  <!-- AOT system library dependencies — only OS libs that can't be bundled as static archives. -->
-
-  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Linux))' == 'true'">
-    <LinkerArg Include="-lGL" />
-    <LinkerArg Include="-lEGL" />
-    <LinkerArg Include="-lX11" />
-    <LinkerArg Include="-lXext" />
-    <LinkerArg Include="-lSM" />
-    <LinkerArg Include="-lICE" />
-    <LinkerArg Include="-ldl" />
-    <LinkerArg Include="-lm" />
-    <LinkerArg Include="-lstdc++" />
-    <LinkerArg Include="-lpthread" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
-    <LinkerArg Include="-framework OpenGL" />
-    <LinkerArg Include="-framework Cocoa" />
-    <LinkerArg Include="-framework Carbon" />
-    <LinkerArg Include="-framework IOKit" />
-    <LinkerArg Include="-framework CoreVideo" />
-    <LinkerArg Include="-framework AudioUnit" />
-    <LinkerArg Include="-framework AudioToolbox" />
-    <LinkerArg Include="-framework CoreAudio" />
-    <LinkerArg Include="-lc++" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Windows))' == 'true'">
-    <LinkerArg Include="opengl32.lib" />
-    <LinkerArg Include="gdi32.lib" />
-    <LinkerArg Include="imm32.lib" />
-    <LinkerArg Include="setupapi.lib" />
-    <LinkerArg Include="shell32.lib" />
-    <LinkerArg Include="winmm.lib" />
-    <LinkerArg Include="ws2_32.lib" />
-    <LinkerArg Include="crypt32.lib" />
-  </ItemGroup>
-
+  <!-- Generate etc/20_panda.prc in the build output with default display/loader config.
+       Plugin-path is left at the default (<auto>) which searches the directory
+       containing p3dtool.dll — that is the same runtimes/{rid}/native/ dir where
+       all native libs live. -->
   <Target Name="_Panda3DCopyPrcConfig" AfterTargets="Build">
     <PropertyGroup>
       <_P3EffectiveRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_P3EffectiveRid>
@@ -123,25 +21,9 @@
       Lines="@(_P3PrcLines)"
       Overwrite="true"
       Condition="'$(_P3EffectiveRid)' != ''" />
-
   </Target>
 
-  <!-- Strip static archives from the build output dir — they are never runtime artifacts.
-       Shared libs remain so dotnet run can load them via DllImport.
-       GetFullPath resolves ../../ so the StartsWith comparison matches item FullPath metadata. -->
-  <Target Name="_Panda3DExcludeStaticArchivesFromBuildOutput"
-          AfterTargets="ResolvePackageAssets">
-    <PropertyGroup>
-      <_P3NativeDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/'))</_P3NativeDir>
-    </PropertyGroup>
-    <ItemGroup>
-      <NativeCopyLocalItems Remove="@(NativeCopyLocalItems)"
-        Condition="$([System.String]::Copy('%(FullPath)').StartsWith('$(_P3NativeDir)')) AND ('%(Extension)' == '.a' OR '%(Extension)' == '.lib')" />
-    </ItemGroup>
-  </Target>
-
-  <!-- Copy the generated PRC config into the publish directory so the deployed
-       application can discover display modules and file-type loaders. -->
+  <!-- Copy PRC config into the publish directory for deployed/AOT binaries. -->
   <Target Name="_Panda3DCopyPrcToPublish" AfterTargets="_Panda3DCopyPrcConfig"
           Condition="'$(PublishDir)' != ''">
     <ItemGroup>
@@ -151,23 +33,6 @@
     <Copy SourceFiles="@(_P3PrcPublish)"
           DestinationFolder="$(PublishDir)etc"
           SkipUnchangedFiles="true" />
-  </Target>
-
-  <!-- AOT publish: strip all native files from the publish output.
-       All platforms — the AOT binary is fully self-contained; native archives
-       are link-time artifacts only and must not ship alongside the executable.
-       Must run before _ComputeResolvedFilesToPublishTypes, which splits ResolvedFileToPublish
-       into the item groups that the copy targets actually consume. -->
-  <Target Name="_Panda3DExcludeSharedLibsFromAotPublish"
-          BeforeTargets="_ComputeResolvedFilesToPublishTypes"
-          Condition="'$(PublishAot)' == 'true'">
-    <PropertyGroup>
-      <_P3NativeDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/'))</_P3NativeDir>
-    </PropertyGroup>
-    <ItemGroup>
-      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-        Condition="$([System.String]::Copy('%(FullPath)').StartsWith('$(_P3NativeDir)'))" />
-    </ItemGroup>
   </Target>
 
 </Project>

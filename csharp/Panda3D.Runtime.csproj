@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- PackageId is set from command line: -p:PackageId=Panda3D.Runtime.{rid} -->
+    <PackageId>Panda3D.Runtime.$(Rid)</PackageId>
+    <Version>1.11.0</Version>
+    <Authors>Panda3D</Authors>
+    <Description>Native runtime libraries for the Panda3D game engine ($(Rid)). Referenced automatically by Panda3D.Interop.</Description>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/panda3d/panda3d</PackageProjectUrl>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoBuild>true</NoBuild>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+
+    <!-- Set from CI: -p:NativeDir=path/to/runtimes/{rid}/native -->
+    <NativeDir Condition="'$(NativeDir)' == ''">$(MSBuildThisFileDirectory)runtimes/$(Rid)/native</NativeDir>
+  </PropertyGroup>
+
+  <!-- Native libraries (shared + static) -->
+  <ItemGroup>
+    <None Include="$(NativeDir)/**" Pack="true" PackagePath="runtimes/$(Rid)/native/" />
+  </ItemGroup>
+
+  <!-- MSBuild targets shipped with the runtime package — handles NativeAOT linking,
+       DirectPInvoke registration, and build output filtering for this RID. -->
+  <ItemGroup>
+    <None Include="Panda3D.Runtime.targets" Pack="true" PackagePath="buildTransitive/net8.0/Panda3D.Runtime.$(Rid).targets" />
+  </ItemGroup>
+</Project>

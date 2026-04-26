@@ -305,9 +305,9 @@ jobs:
           path: build/csharp/
           if-no-files-found: error
 
-  # Stage 2 — Assemble the NuGet package from all the artifacts we just made
+  # Stage 2 — Pack per-RID runtime packages and the managed interop package
   pack-nuget:
-    name: Pack NuGet Package
+    name: Pack NuGet Packages
     runs-on: ubuntu-24.04
     needs: build-panda3d
 
@@ -331,8 +331,8 @@ jobs:
           name: interrogate-core-version
           path: artifacts/interrogate-core-version/
 
-      # Build the runtimes/ tree expected by Panda3D.csproj
-      - name: Assemble runtimes directory
+      # Assemble per-RID native directories
+      - name: Assemble runtimes directories
         run: |
           for rid in linux-x64 win-x64 osx-x64 osx-arm64; do
             mkdir -p "runtimes/$rid/native"
@@ -354,19 +354,43 @@ jobs:
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
-      - name: Pack Panda3D
+      # Pack one Panda3D.Runtime.{rid} package per RID
+      - name: Pack runtime packages
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          for rid in linux-x64 win-x64 osx-x64 osx-arm64; do
+            nativedir="${{ github.workspace }}/runtimes/$rid/native"
+            [ -d "$nativedir" ] || continue
+            dotnet pack csharp/Panda3D.Runtime.csproj \
+              -c Release \
+              -p:Rid="$rid" \
+              -p:Version="$VERSION" \
+              -p:NativeDir="$nativedir" \
+              -o nupkg/
+          done
+
+      - name: List runtime package contents
+        run: |
+          for pkg in nupkg/Panda3D.Runtime.*.nupkg; do
+            echo "=== $(basename "$pkg") ==="
+            unzip -l "$pkg" | grep -E '\.so|\.dll|\.dylib|\.a|\.lib|\.targets' | sort
+          done
+
+      # Pack the managed Panda3D.Interop package (no native libs, depends on runtime packages).
+      # Add nupkg/ as a local source so the runtime package refs resolve during restore.
+      - name: Pack Panda3D.Interop
         run: |
           IGATE_VER_RANGE=$(cat artifacts/interrogate-core-version/igate-core-ver.txt)
-          dotnet pack csharp/Panda3D.csproj \
+          VERSION="${{ steps.ver.outputs.version }}"
+          dotnet pack csharp/Panda3D.Interop.csproj \
             -c Release \
-            -p:Version="${{ steps.ver.outputs.version }}" \
+            -p:Version="$VERSION" \
             -p:GeneratedSourcesDir="${{ github.workspace }}/artifacts/panda3d-csharp-sources" \
-            -p:RuntimesDir="${{ github.workspace }}/runtimes" \
             -p:InterrogateCoreVersion="$IGATE_VER_RANGE" \
             -o nupkg/
 
-      - name: List package contents
-        run: unzip -l nupkg/*.nupkg | grep -E 'runtimes|Generated|\.cs|\.so|\.dll|\.dylib|\.a|\.lib' | sort
+      - name: List interop package contents
+        run: unzip -l nupkg/Panda3D.Interop.*.nupkg | sort
 
       - uses: actions/upload-artifact@v4
         with:
