@@ -9,6 +9,10 @@
 
   <ItemGroup>
     <PackageReference Include="Panda3D.Interop" Version="1.11.0-preview.*" />
+    <PackageReference Include="Panda3D.Runtime.linux-x64" Version="1.11.0-preview.*" />
+    <PackageReference Include="Panda3D.Runtime.osx-arm64" Version="1.11.0-preview.*" />
+    <PackageReference Include="Panda3D.Runtime.osx-x64" Version="1.11.0-preview.*" />
+    <PackageReference Include="Panda3D.Runtime.win-x64" Version="1.11.0-preview.*" />
   </ItemGroup>
 
   <ItemGroup>

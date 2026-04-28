@@ -29,8 +29,8 @@
 
   </Target>
 
-  <!-- Linux: --whole-archive for libpandagl.a to override weak get_pipe_type stubs.
-       --start-group/--end-group for circular deps between Panda3D archives. -->
+  <!-- Linux: whole-archive for libpandagl.a to override weak get_pipe_type stubs.
+       start-group/end-group for circular deps between Panda3D archives. -->
   <Target Name="_Panda3DLinkerGroup" AfterTargets="SetupOSSpecificProps"
           Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(Linux))' == 'true'">
     <PropertyGroup>
@@ -47,7 +47,7 @@
     </ItemGroup>
   </Target>
 
-  <!-- macOS: -force_load for libpandagl.a (Apple ld equivalent of --whole-archive). -->
+  <!-- macOS: -force_load for libpandagl.a (Apple ld equivalent of whole-archive). -->
   <Target Name="_Panda3DMacOSLinkerSetup" AfterTargets="SetupOSSpecificProps"
           Condition="'$(PublishAot)' == 'true' AND '$([MSBuild]::IsOSPlatform(OSX))' == 'true'">
     <PropertyGroup>
