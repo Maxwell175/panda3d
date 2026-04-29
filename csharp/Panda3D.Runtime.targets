@@ -11,16 +11,17 @@
       <_P3NativeDir>$(MSBuildThisFileDirectory)../../runtimes/$(RuntimeIdentifier)/native/</_P3NativeDir>
     </PropertyGroup>
 
-    <ItemGroup Condition="!$([MSBuild]::IsOSPlatform(Windows))">
+    <!-- Skip if this package's RID doesn't match $(RuntimeIdentifier): -->
+    <ItemGroup Condition="!$([MSBuild]::IsOSPlatform(Windows)) AND Exists('$(_P3NativeDir)')">
       <_P3Lib Include="$(_P3NativeDir)*.a" />
       <DirectPInvoke Include="$([System.String]::Copy('%(_P3Lib.Filename)').Substring(3))" />
     </ItemGroup>
 
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(OSX))">
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(OSX)) AND Exists('$(_P3NativeDir)')">
       <NativeLibrary Include="@(_P3Lib)" />
     </ItemGroup>
 
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(Windows))">
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform(Windows)) AND Exists('$(_P3NativeDir)')">
       <_P3Lib Include="$(_P3NativeDir)*.lib" />
       <NativeLibrary Include="@(_P3Lib)" />
       <_P3MetaLib Include="$(_P3NativeDir)lib*.lib" />
