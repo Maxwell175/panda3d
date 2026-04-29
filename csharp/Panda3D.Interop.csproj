@@ -9,6 +9,7 @@
     <Description>C# bindings for the Panda3D game engine.</Description>
     <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/panda3d/panda3d</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <IsPackable>true</IsPackable>
 
     <!--
@@ -47,6 +48,7 @@
   <!-- MSBuild integration targets (transitive import into consuming projects) -->
   <ItemGroup>
     <None Include="Panda3D.NuGet.targets" Pack="true" PackagePath="buildTransitive/net8.0/Panda3D.Interop.targets" />
+    <None Include="../README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <Import Project="Panda3D.targets" />
