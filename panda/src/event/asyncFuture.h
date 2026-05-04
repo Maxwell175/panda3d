@@ -88,6 +88,13 @@ PUBLISHED:
   BLOCKING void wait(double timeout);
 
   PY_EXTENSION(void set_result(PyObject *));
+
+  // C# extension methods — implemented in asyncFuture_ext_csharp.cxx.
+  CSHARP_EXTENSION(void set_result_none());
+  CSHARP_EXTENSION(void set_result_object(TypedObject *result));
+  CSHARP_EXTENSION(TypedObject *get_result_ptr() const);
+  CSHARP_EXTENSION(bool add_waiting_task_csharp(AsyncTask *task));
+  CSHARP_EXTENSION(static PT(AsyncFuture) gather_csharp(AsyncFuture **futures, int count));
 public:
   INLINE void set_result(std::nullptr_t);
   INLINE void set_result(TypedReferenceCount *result);

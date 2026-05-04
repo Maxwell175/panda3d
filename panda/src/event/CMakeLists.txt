@@ -44,6 +44,17 @@ set(P3EVENT_IGATEEXT
   pythonTask.I
 )
 
+if(HAVE_CSHARP)
+  set(P3EVENT_HEADERS ${P3EVENT_HEADERS}
+    managedAsyncTask.h managedAsyncTask.I)
+  set(P3EVENT_SOURCES ${P3EVENT_SOURCES}
+    managedAsyncTask.cxx
+    asyncFuture_ext_csharp.cxx)
+  set(P3EVENT_IGATEEXT ${P3EVENT_IGATEEXT}
+    asyncFuture_ext_csharp.h
+    asyncFuture_ext_csharp.cxx)
+endif()
+
 composite_sources(p3event P3EVENT_SOURCES)
 add_component_library(p3event NOINIT SYMBOL BUILDING_PANDA_EVENT
   ${P3EVENT_HEADERS} ${P3EVENT_SOURCES})
