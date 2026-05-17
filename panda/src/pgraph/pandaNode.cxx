@@ -3270,20 +3270,32 @@ update_cached(bool update_bounds, int pipeline_stage, PandaNode::CDLockedStageRe
       off_clip_planes = ClipPlaneAttrib::make();
     }
 
-    // Also get the list of the node's children.  When the cdataw destructs, it
-    // will also release the lock, since we've got all the data we need from the
-    // node.
-    PT(Down) down;
+    // Take a READ-only snapshot of the children list.
+    // By using get_down() (CPT) instead of modify_down() (PT),
+    // no LS_locked_write flag is set. We defer all per-connection
+    // cache writes to the commit phase below, where they
+    // happen inside a fresh, briefly-scoped modify_down() PT that
+    // cannot escape its cycler.
+    CPT(Down) down;
     {
       CDStageWriter cdataw(_cycler, pipeline_stage, cdata);
-      down = cdataw->modify_down();
+      down = cdataw->get_down();
     }
 
-    // Now that we've got all the data we need from the node, we can release
-    // the lock.
-    //_cycler.release_read_stage(pipeline_stage, cdata.take_pointer());
+    int num_children = (int)down->size();
 
-    int num_children = down->size();
+    // Per-connection cache values are accumulated locally during the
+    // iteration below and then applied to the live _down in the commit
+    // phase.  This is what lets us iterate with only a CPT snapshot.
+    struct PendingConnection {
+      PandaNode *child;
+      CollideMask net_collide_mask;
+      CPT(GeometricBoundingVolume) external_bounds;
+      DrawMask net_draw_control_mask;
+      DrawMask net_draw_show_mask;
+    };
+    pvector<PendingConnection> pending_cache;
+    pending_cache.resize(num_children);
 
     // We need to keep references to the bounding volumes, since in a threaded
     // environment the pointers might go away while we're working (since we're
@@ -3317,8 +3329,10 @@ update_cached(bool update_bounds, int pipeline_stage, PandaNode::CDLockedStageRe
     int child_vertices = 0;
 
     for (int i = 0; i < num_children; ++i) {
-      DownConnection &connection = (*down)[i];
+      const DownConnection &connection = (*down)[i];
       PandaNode *child = connection.get_child();
+      PendingConnection &pending = pending_cache[i];
+      pending.child = child;
 
       const ClipPlaneAttrib *orig_cp = DCAST(ClipPlaneAttrib, off_clip_planes);
 
@@ -3334,7 +3348,7 @@ update_cached(bool update_bounds, int pipeline_stage, PandaNode::CDLockedStageRe
 
         CollideMask child_collide_mask = child_cdataw->_net_collide_mask;
         net_collide_mask |= child_collide_mask;
-        connection._net_collide_mask = child_collide_mask;
+        pending.net_collide_mask = child_collide_mask;
 
         if (drawmask_cat.is_debug()) {
           drawmask_cat.debug(false)
@@ -3416,17 +3430,17 @@ update_cached(bool update_bounds, int pipeline_stage, PandaNode::CDLockedStageRe
           }
           child_vertices += child_cdataw->_nested_vertices;
 
-          connection._external_bounds = child_cdataw->_external_bounds->as_geometric_bounding_volume();
+          pending.external_bounds = child_cdataw->_external_bounds->as_geometric_bounding_volume();
         }
 
-        connection._net_draw_control_mask = child_control_mask;
-        connection._net_draw_show_mask = child_show_mask;
+        pending.net_draw_control_mask = child_control_mask;
+        pending.net_draw_show_mask = child_show_mask;
 
       } else {
         // Child is good.
         CollideMask child_collide_mask = child_cdata->_net_collide_mask;
         net_collide_mask |= child_collide_mask;
-        connection._net_collide_mask = child_collide_mask;
+        pending.net_collide_mask = child_collide_mask;
 
         // See comments in similar block above.
         if (drawmask_cat.is_debug()) {
@@ -3475,11 +3489,11 @@ update_cached(bool update_bounds, int pipeline_stage, PandaNode::CDLockedStageRe
           }
           child_vertices += child_cdata->_nested_vertices;
 
-          connection._external_bounds = child_cdata->_external_bounds->as_geometric_bounding_volume();
+          pending.external_bounds = child_cdata->_external_bounds->as_geometric_bounding_volume();
         }
 
-        connection._net_draw_control_mask = child_control_mask;
-        connection._net_draw_show_mask = child_show_mask;
+        pending.net_draw_control_mask = child_control_mask;
+        pending.net_draw_show_mask = child_show_mask;
       }
     }
 
@@ -3490,6 +3504,30 @@ update_cached(bool update_bounds, int pipeline_stage, PandaNode::CDLockedStageRe
           next_update == cdataw->_next_update) {
         // Great, no one has monkeyed with these while we were computing the
         // cache.  Safe to store the computed values and return.
+
+        // Apply the deferred per-connection cache writes via a briefly-
+        // scoped writable Down pointer.
+        {
+          PT(Down) writable_down = cdataw->modify_down();
+          int n = (int)writable_down->size();
+          int apply_count = (n < num_children) ? n : num_children;
+          for (int i = 0; i < apply_count; ++i) {
+            DownConnection &c = (*writable_down)[i];
+            const PendingConnection &p = pending_cache[i];
+            // Defensive identity check: the staleness check above
+            // guarantees no structural change, but just lto be safe...
+            if (c.get_child() != p.child) {
+              continue;
+            }
+            c._net_collide_mask = p.net_collide_mask;
+            if (update_bounds) {
+              c._external_bounds = p.external_bounds;
+            }
+            c._net_draw_control_mask = p.net_draw_control_mask;
+            c._net_draw_show_mask = p.net_draw_show_mask;
+          }
+        }
+
         cdataw->_net_collide_mask = net_collide_mask;
 
         if (renderable) {
