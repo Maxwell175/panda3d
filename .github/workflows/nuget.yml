@@ -149,10 +149,14 @@ jobs:
 
       - name: Configure (Linux)
         if: runner.os == 'Linux'
+        # Shared builds are configured Standard (the default engine profile: debug
+        # features like collision recording / PStats are compiled in) so the Debug
+        # binding variant's extra P/Invokes resolve at runtime. Static builds are
+        # Release (lean, NDEBUG) — they back the NativeAOT-safe Release variant.
         run: |
           cmake -B build \
             -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=${{ matrix.link == 'shared' && 'Standard' || 'Release' }} \
             -DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} \
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
@@ -165,7 +169,7 @@ jobs:
         run: |
           cmake -B build \
             -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=${{ matrix.link == 'shared' && 'Standard' || 'Release' }} \
             -DCMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_osx_arch }} \
             -DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} \
             -DINTERROGATE_CSHARP_INTERFACE=ON \
@@ -190,7 +194,9 @@ jobs:
             '-DDEFAULT_PRC_DIR=<auto>etc'
 
       - name: Build
-        run: cmake --build build --config Release --parallel 8
+        # --config only affects the Windows multi-config generator; single-config
+        # Ninja (Linux/macOS) takes its type from CMAKE_BUILD_TYPE above.
+        run: cmake --build build --config ${{ matrix.link == 'shared' && 'Standard' || 'Release' }} --parallel 8
 
       - name: Patch shared library metadata
         if: runner.os != 'Windows' && matrix.link == 'shared'
@@ -305,11 +311,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item tools-dist -ItemType Directory -Force
-          # VS multi-config emits the exes + their DLLs in build\Release\bin (not build\bin).
-          Get-ChildItem build\Release\bin -Filter *.exe |
+          # VS multi-config emits the exes + their DLLs under build\<Config>\bin (not
+          # build\bin). Shared builds are configured Standard, so that's the dir here.
+          Get-ChildItem build\Standard\bin -Filter *.exe |
             Where-Object { $_.BaseName -notmatch '^(cycler_bench|ebr_cycler|scenegraph_bench|scenegraph_stress)$' } |
             Copy-Item -Destination tools-dist\
-          Get-ChildItem build\Release\bin -Filter *.dll |
+          Get-ChildItem build\Standard\bin -Filter *.dll |
             Where-Object { $_.Name -notmatch 'igate' -and $_.Name -notmatch 'supplemental' } |
             Copy-Item -Destination tools-dist\ -ErrorAction SilentlyContinue
           Get-ChildItem tools-dist\
@@ -341,11 +348,15 @@ jobs:
           path: igate-ver/igate-core-ver.txt
           if-no-files-found: error
 
+      # Two binding surfaces are generated, one per config: the Standard (shared)
+      # build emits the full surface (debug-feature methods included) that backs the
+      # Debug Interop variant; the Release (static) build emits the lean, AOT-safe
+      # surface that backs the Release variant. Both are packed later into one package.
       - name: Upload C# sources
-        if: matrix.rid == 'linux-x64' && matrix.link == 'shared'
+        if: matrix.rid == 'linux-x64'
         uses: actions/upload-artifact@v4
         with:
-          name: panda3d-csharp-sources
+          name: panda3d-csharp-sources-${{ matrix.link == 'shared' && 'standard' || 'release' }}
           path: build/csharp/
           if-no-files-found: error
 
@@ -420,16 +431,36 @@ jobs:
             unzip -l "$pkg" | grep -E '\.so|\.dll|\.dylib|\.a|\.lib|\.targets' | sort
           done
 
-      # Pack the managed Panda3D.Interop package (no native libs, depends on runtime packages).
-      # Add nupkg/ as a local source so the runtime package refs resolve during restore.
+      # Pack the managed Panda3D.Interop package. It ships two assemblies with
+      # different API surfaces, so we compile Panda3D.Interop.csproj twice — once
+      # against the Standard binding sources (the full Debug variant) and once
+      # against the Release sources (the lean, AOT-safe variant) — then bundle both
+      # via Panda3D.Interop.Package.csproj. Distinct intermediate dirs keep the two
+      # compilations from sharing obj/ and cross-contaminating.
       - name: Pack Panda3D.Interop
         run: |
           IGATE_VER_RANGE=$(cat artifacts/interrogate-core-version/igate-core-ver.txt)
           VERSION="${{ steps.ver.outputs.version }}"
-          dotnet pack csharp/Panda3D.Interop.csproj \
+
+          dotnet build csharp/Panda3D.Interop.csproj \
+            -c Release \
+            -p:GeneratedSourcesDir="${{ github.workspace }}/artifacts/panda3d-csharp-sources-standard" \
+            -p:InterrogateCoreVersion="$IGATE_VER_RANGE" \
+            -p:IntermediateOutputPath=obj/variant-standard/ \
+            -o "${{ github.workspace }}/interop-debug"
+
+          dotnet build csharp/Panda3D.Interop.csproj \
+            -c Release \
+            -p:GeneratedSourcesDir="${{ github.workspace }}/artifacts/panda3d-csharp-sources-release" \
+            -p:InterrogateCoreVersion="$IGATE_VER_RANGE" \
+            -p:IntermediateOutputPath=obj/variant-release/ \
+            -o "${{ github.workspace }}/interop-release"
+
+          dotnet pack csharp/Panda3D.Interop.Package.csproj \
             -c Release \
             -p:Version="$VERSION" \
-            -p:GeneratedSourcesDir="${{ github.workspace }}/artifacts/panda3d-csharp-sources" \
+            -p:DebugInteropDll="${{ github.workspace }}/interop-debug/Panda3D.Interop.dll" \
+            -p:ReleaseInteropDll="${{ github.workspace }}/interop-release/Panda3D.Interop.dll" \
             -p:InterrogateCoreVersion="$IGATE_VER_RANGE" \
             -o nupkg/
 

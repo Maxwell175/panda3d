@@ -11,11 +11,14 @@
     <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/panda3d/panda3d</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <IsPackable>true</IsPackable>
+    <!-- Compile-only: this builds ONE variant assembly from the given binding sources.
+         The NuGet package (both Debug + Release variants) is produced by
+         Panda3D.Interop.Package.csproj, which bundles the assemblies this emits. -->
+    <IsPackable>false</IsPackable>
 
     <!--
-      Override when packing from CI:
-        dotnet pack -p:GeneratedSourcesDir=/path/to/build/csharp
+      Override to point at a specific config's generated sources:
+        dotnet build -p:GeneratedSourcesDir=/path/to/build/csharp
       Local default points to cmake-build-debug layout.
     -->
     <GeneratedSourcesDir Condition="'$(GeneratedSourcesDir)' == ''">../cmake-build-debug/csharp</GeneratedSourcesDir>
@@ -47,12 +50,6 @@
     <!-- Panda3D.Tools.Tasks is a separate MSBuild-task assembly nested in this dir;
          the SDK default glob would otherwise pull its sources into the bindings. -->
     <Compile Remove="Panda3D.Tools.Tasks/**/*.cs" />
-  </ItemGroup>
-
-  <!-- MSBuild integration targets (transitive import into consuming projects) -->
-  <ItemGroup>
-    <None Include="Panda3D.NuGet.targets" Pack="true" PackagePath="buildTransitive/net8.0/Panda3D.Interop.targets" />
-    <None Include="../README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <Import Project="Panda3D.targets" />

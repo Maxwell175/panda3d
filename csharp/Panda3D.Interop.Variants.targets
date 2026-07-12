@@ -1,0 +1,45 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Panda3D.Interop ships two assemblies with different API surfaces:
+
+         Debug   — the full binding surface, including methods that only exist in a
+                   Standard/Debug engine build (collision recording, PStats, memory
+                   tracking). Resolves against the Standard shared runtime; for
+                   development / JIT.
+         Release — the lean, AOT-safe surface. The debug-only methods aren't present,
+                   so code that uses them fails to COMPILE here instead of failing to
+                   link later under NativeAOT. Use it to validate a release build
+                   before turning on PublishAot.
+
+       Which one a project gets is derived from the build's OPTIMIZATION, not a literal
+       configuration name, so custom configuration names ("Staging", "QA", …) work:
+       an optimized build gets Release, a non-optimized/DEBUG build gets Debug. Override
+       explicitly at any time with  -p:Panda3DInteropConfiguration=Debug|Release . -->
+
+  <PropertyGroup>
+    <!-- Explicit override wins. -->
+    <_P3InteropCfg>$(Panda3DInteropConfiguration)</_P3InteropCfg>
+
+    <!-- Otherwise: any signal of a non-optimized / debug build selects Debug; everything
+         else (incl. unknown custom configurations) defaults to the safe, lean Release. -->
+    <_P3InteropCfg Condition="'$(_P3InteropCfg)' == '' and '$(Optimize)' == 'false'">Debug</_P3InteropCfg>
+    <_P3InteropCfg Condition="'$(_P3InteropCfg)' == '' and $(DefineConstants.Contains('DEBUG'))">Debug</_P3InteropCfg>
+    <_P3InteropCfg Condition="'$(_P3InteropCfg)' == '' and '$(Configuration)' == 'Debug'">Debug</_P3InteropCfg>
+    <_P3InteropCfg Condition="'$(_P3InteropCfg)' == ''">Release</_P3InteropCfg>
+
+    <Panda3DInteropConfiguration>$(_P3InteropCfg)</Panda3DInteropConfiguration>
+    <_P3InteropDll>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../variants/$(Panda3DInteropConfiguration)/Panda3D.Interop.dll'))</_P3InteropDll>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(_P3InteropDll)')">
+    <Reference Include="Panda3D.Interop">
+      <HintPath>$(_P3InteropDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Shared consumer-facing logic (writes etc/*.prc into the output/publish dir). -->
+  <Import Project="$(MSBuildThisFileDirectory)Panda3D.Interop.Prc.targets"
+          Condition="Exists('$(MSBuildThisFileDirectory)Panda3D.Interop.Prc.targets')" />
+
+</Project>
