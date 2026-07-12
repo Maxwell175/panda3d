@@ -305,10 +305,11 @@ jobs:
         shell: pwsh
         run: |
           New-Item tools-dist -ItemType Directory -Force
-          Get-ChildItem build\bin -Filter *.exe |
+          # VS multi-config emits the exes + their DLLs in build\Release\bin (not build\bin).
+          Get-ChildItem build\Release\bin -Filter *.exe |
             Where-Object { $_.BaseName -notmatch '^(cycler_bench|ebr_cycler|scenegraph_bench|scenegraph_stress)$' } |
             Copy-Item -Destination tools-dist\
-          Get-ChildItem -Recurse build -Filter *.dll |
+          Get-ChildItem build\Release\bin -Filter *.dll |
             Where-Object { $_.Name -notmatch 'igate' -and $_.Name -notmatch 'supplemental' } |
             Copy-Item -Destination tools-dist\ -ErrorAction SilentlyContinue
           Get-ChildItem tools-dist\
