@@ -19,6 +19,10 @@
     <!-- Set from CI: -p:ToolsDir=path/to/tools  (containing per-RID subdirectories,
          e.g. tools/linux-x64/egg2bam, tools/win-x64/egg2bam.exe). -->
     <ToolsDir Condition="'$(ToolsDir)' == ''">$(MSBuildThisFileDirectory)tools</ToolsDir>
+
+    <!-- The compiled MSBuild task assembly (one task per pipeline tool). Built from
+         Panda3D.Tools.Tasks/ before packing; override with -p:TasksDll=… in CI. -->
+    <TasksDll Condition="'$(TasksDll)' == ''">$(MSBuildThisFileDirectory)Panda3D.Tools.Tasks/bin/Release/netstandard2.0/Panda3D.Tools.Tasks.dll</TasksDll>
   </PropertyGroup>
 
   <!-- All platforms' tool bundles, preserving the <rid>/ layout under tools/. -->
@@ -27,9 +31,10 @@
     <None Include="../README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
-  <!-- MSBuild targets: resolve the host RID's bundle and expose it to the pipeline.
+  <!-- MSBuild targets: resolve the host RID's bundle and register the per-tool tasks.
        buildTransitive so it applies to direct and transitive PackageReferences. -->
   <ItemGroup>
     <None Include="Panda3D.Tools.targets" Pack="true" PackagePath="buildTransitive/Panda3D.Tools.targets" />
+    <None Include="$(TasksDll)" Pack="true" PackagePath="tasks/netstandard2.0/" Condition="Exists('$(TasksDll)')" />
   </ItemGroup>
 </Project>

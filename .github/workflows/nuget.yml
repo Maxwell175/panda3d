@@ -450,6 +450,11 @@ jobs:
           echo "=== tools layout ===" && find tools -type f | sort | sed -n '1,60p'
           echo "=== per-rid counts ===" && for d in tools/*/; do echo "$d $(ls "$d" | wc -l) files"; done
 
+      # Compile the MSBuild task assembly (one task per pipeline tool) that ships in
+      # the package; the pack step below includes its DLL under tasks/netstandard2.0/.
+      - name: Build Panda3D.Tools.Tasks
+        run: dotnet build csharp/Panda3D.Tools.Tasks/Panda3D.Tools.Tasks.csproj -c Release
+
       - name: Pack Panda3D.Tools
         run: |
           VERSION="${{ steps.ver.outputs.version }}"
@@ -457,6 +462,7 @@ jobs:
             -c Release \
             -p:Version="$VERSION" \
             -p:ToolsDir="${{ github.workspace }}/tools" \
+            -p:TasksDll="${{ github.workspace }}/csharp/Panda3D.Tools.Tasks/bin/Release/netstandard2.0/Panda3D.Tools.Tasks.dll" \
             -o nupkg/
 
       - name: List tools package contents

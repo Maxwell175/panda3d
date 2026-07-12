@@ -46,6 +46,61 @@
     <Panda3DPStats>$(Panda3DToolsDir)/pstats$(Panda3DToolExtension)</Panda3DPStats>
   </PropertyGroup>
 
+  <!-- MSBuild tasks: one per pipeline tool (not pview/pstats), from the shipped
+       task assembly. e.g. <Egg2Bam Inputs="m.egg" Output="m.bam" />. Each resolves
+       the host-platform exe from this package; pass ToolsDir to override. -->
+  <PropertyGroup>
+    <_P3TasksDll>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tasks/netstandard2.0/Panda3D.Tools.Tasks.dll'))</_P3TasksDll>
+  </PropertyGroup>
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Egg2Bam" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Bam2Egg" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.BamInfo" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Pzip" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Punzip" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Multify" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggTrans" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggCrop" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggOptchar" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggPalettize" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggQtess" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggRename" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggRetargetAnim" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggTextureCards" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggTopstrip" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggMakeTube" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggListTextures" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.EggMkfont" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Egg2Flt" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Flt2Egg" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.FltInfo" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.FltTrans" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Egg2Obj" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Obj2Egg" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Egg2Dxf" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Dxf2Egg" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.DxfPoints" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Egg2X" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.X2Egg" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.XTrans" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Vrml2Egg" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.VrmlTrans" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Lwo2Egg" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.LwoScan" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.ImageTrans" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.ImageResize" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.ImageInfo" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.ImageFixHiddenColor" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.ImageTransformColors" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.PfmTrans" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.PfmBba" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Pts2Bam" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Pdecrypt" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Pencrypt" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.TxoConverter" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.P3dcparse" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Bin2C" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+  <UsingTask TaskName="Panda3D.Tools.Tasks.Egg2C" AssemblyFile="$(_P3TasksDll)" Condition="Exists('$(_P3TasksDll)')" />
+
   <!-- NuGet does not preserve the Unix executable bit, so restore the +x on the
        host tools once per build before anything invokes them. No-op on Windows. -->
   <Target Name="Panda3DToolsEnsureExecutable"
