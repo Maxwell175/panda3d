@@ -399,6 +399,7 @@ set_recorder(CollisionRecorder *recorder) {
   }
 #endif
 }
+#endif  // DO_COLLISION_RECORDING
 
 /**
  * This is a high-level function to create a CollisionVisualizer object to
@@ -431,8 +432,6 @@ hide_collisions() {
   clear_recorder();
 #endif
 }
-
-#endif  // DO_COLLISION_RECORDING
 
 /**
  *
