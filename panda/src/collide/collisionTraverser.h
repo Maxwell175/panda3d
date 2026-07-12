@@ -72,14 +72,10 @@ PUBLISHED:
   INLINE void clear_recorder();
   MAKE_PROPERTY2(recorder, has_recorder, get_recorder,
                            set_recorder, clear_recorder);
-#endif  // DO_COLLISION_RECORDING
 
-  // Always published so the bindings stay config-independent. When
-  // DO_COLLISION_RECORDING is not compiled in (optimized builds) these are
-  // no-ops — show_collisions returns nullptr — so the symbols exist without
-  // pulling in the recorder/visualizer machinery.
   PandaNode *show_collisions(const NodePath &root);
   void hide_collisions();
+#endif  // DO_COLLISION_RECORDING
 
   void output(std::ostream &out) const;
   void write(std::ostream &out, int indent_level) const;
