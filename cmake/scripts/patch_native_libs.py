@@ -137,6 +137,38 @@ def _flatten(root: Path, ver_pat: re.Pattern, base_fn,
             pass
 
 
+# Mach-O magics as they appear on disk (little-endian hosts) plus the universal
+# ("fat") magic, so tool executables are recognised on both Linux and macOS.
+_EXE_MAGICS = (
+    b'\x7fELF',                                  # ELF (Linux)
+    b'\xcf\xfa\xed\xfe', b'\xce\xfa\xed\xfe',    # Mach-O 64/32-bit
+    b'\xca\xfe\xba\xbe', b'\xbe\xba\xfe\xca',    # Mach-O universal (fat)
+)
+
+
+def _iter_executables(root: Path) -> list[Path]:
+    """Native tool executables under ``bin/`` (ELF/Mach-O, by magic number).
+
+    Patched alongside the libraries so a bundle of exes + libs in one directory
+    relocates via ``$ORIGIN`` / ``@loader_path``.
+    """
+    bindir = root / 'bin'
+    if not bindir.is_dir():
+        return []
+    result: list[Path] = []
+    for entry in sorted(bindir.iterdir()):
+        if not entry.is_file() or entry.is_symlink():
+            continue
+        try:
+            with open(entry, 'rb') as fh:
+                magic = fh.read(4)
+        except OSError:
+            continue
+        if any(magic.startswith(m) for m in _EXE_MAGICS):
+            result.append(entry)
+    return result
+
+
 def _iter_libs(root: Path, name_pat: re.Pattern,
                max_depth: int = 4) -> list[Path]:
     seen: set[str] = set()
@@ -198,6 +230,14 @@ def main() -> None:
         print(f'  patching {lib}')
         patch(str(lib), known_bases)
     print(f'patched {len(libs)} libraries in {build_dir}')
+
+    # Also patch the bin/ tool executables (see _iter_executables); harmless to
+    # the runtime packages, which collect only libraries.
+    exes = _iter_executables(build_dir)
+    for exe in exes:
+        print(f'  patching exe {exe}')
+        patch(str(exe), known_bases)
+    print(f'patched {len(exes)} executables in {build_dir}')
 
 
 if __name__ == '__main__':
