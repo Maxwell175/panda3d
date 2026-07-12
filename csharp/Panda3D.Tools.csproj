@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <PackageId>Panda3D.Tools</PackageId>
+    <Version>1.11.0</Version>
+    <Authors>Panda3D</Authors>
+    <Description>Panda3D command-line tools (egg2bam, bam2egg, pzip/punzip, egg-trans, egg-optchar, egg-palettize, multify, pview, pstats, image-resize, …) for win-x64, linux-x64, osx-x64 and osx-arm64. A self-contained, host-selected toolchain for asset pipelines — each platform's bundle carries the tools plus the Panda shared libraries they need. Consumed via MSBuild: the shipped targets expose $(Panda3DToolsDir) and per-tool paths for the host RID.</Description>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/panda3d/panda3d</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsPackable>true</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoBuild>true</NoBuild>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <!-- This is a build-tools package (all assets under tools/ + a targets file),
+         it ships no managed lib and takes on no dependencies. -->
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+
+    <!-- Set from CI: -p:ToolsDir=path/to/tools  (containing per-RID subdirectories,
+         e.g. tools/linux-x64/egg2bam, tools/win-x64/egg2bam.exe). -->
+    <ToolsDir Condition="'$(ToolsDir)' == ''">$(MSBuildThisFileDirectory)tools</ToolsDir>
+  </PropertyGroup>
+
+  <!-- All platforms' tool bundles, preserving the <rid>/ layout under tools/. -->
+  <ItemGroup>
+    <None Include="$(ToolsDir)/**" Pack="true" PackagePath="tools/" />
+    <None Include="../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- MSBuild targets: resolve the host RID's bundle and expose it to the pipeline.
+       buildTransitive so it applies to direct and transitive PackageReferences. -->
+  <ItemGroup>
+    <None Include="Panda3D.Tools.targets" Pack="true" PackagePath="buildTransitive/Panda3D.Tools.targets" />
+  </ItemGroup>
+</Project>

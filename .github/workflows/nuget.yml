@@ -124,7 +124,8 @@ jobs:
             ninja-build bison flex patchelf \
             libgl1-mesa-dev libegl1-mesa-dev \
             libx11-dev libxcursor-dev libxrandr-dev libxi-dev libxext-dev \
-            libsm-dev libice-dev
+            libsm-dev libice-dev \
+            libgtk-3-dev
 
       - name: Install build tools (macOS)
         if: runner.os == 'macOS'
@@ -278,6 +279,48 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+      # Collect the tools into a self-contained per-RID bundle: the executables
+      # (minus internal benchmarks) plus the Panda shared libs they load. Shared
+      # build only — patch_native_libs.py above already made the exes relocatable.
+      - name: Collect tools bundle (Linux/macOS)
+        if: runner.os != 'Windows' && matrix.link == 'shared'
+        shell: bash
+        run: |
+          mkdir tools-dist
+          for f in build/bin/*; do
+            [ -f "$f" ] && [ -x "$f" ] || continue
+            case "$(basename "$f")" in
+              cycler_bench|ebr_cycler|scenegraph_bench|scenegraph_stress) continue ;;
+            esac
+            cp "$f" tools-dist/
+          done
+          ext=$([ "${{ runner.os }}" = "macOS" ] && echo dylib || echo so)
+          find build -maxdepth 4 -name "*.${ext}" \
+            ! -name "*igate*" ! -name "*supplemental*" \
+            -exec cp -n {} tools-dist/ \; 2>/dev/null || true
+          echo "--- tools bundle ---" && ls -la tools-dist/
+
+      - name: Collect tools bundle (Windows)
+        if: runner.os == 'Windows' && matrix.link == 'shared'
+        shell: pwsh
+        run: |
+          New-Item tools-dist -ItemType Directory -Force
+          Get-ChildItem build\bin -Filter *.exe |
+            Where-Object { $_.BaseName -notmatch '^(cycler_bench|ebr_cycler|scenegraph_bench|scenegraph_stress)$' } |
+            Copy-Item -Destination tools-dist\
+          Get-ChildItem -Recurse build -Filter *.dll |
+            Where-Object { $_.Name -notmatch 'igate' -and $_.Name -notmatch 'supplemental' } |
+            Copy-Item -Destination tools-dist\ -ErrorAction SilentlyContinue
+          Get-ChildItem tools-dist\
+
+      - name: Upload tools bundle
+        if: matrix.link == 'shared'
+        uses: actions/upload-artifact@v4
+        with:
+          name: panda3d-tools-${{ matrix.rid }}
+          path: tools-dist/
+          if-no-files-found: error
+
       # Read the Version from Interrogate.Core.csproj and derive major.minor.*
       # so the packed Panda3D.nupkg requires a compatible Interrogate.Core from NuGet.
       - name: Extract Interrogate.Core version range
@@ -391,6 +434,33 @@ jobs:
 
       - name: List interop package contents
         run: unzip -l nupkg/Panda3D.Interop.*.nupkg | sort
+
+      # Assemble each platform's tool bundle under tools/<rid>/ and pack the single
+      # cross-platform Panda3D.Tools package (Grpc.Tools-style: all RIDs in one
+      # package, host-selected at build time by the shipped targets).
+      - name: Assemble tools directories
+        run: |
+          for rid in linux-x64 win-x64 osx-x64 osx-arm64; do
+            src="artifacts/panda3d-tools-${rid}"
+            [ -d "$src" ] || continue
+            mkdir -p "tools/$rid"
+            cp "$src"/* "tools/$rid/" 2>/dev/null || true
+            chmod +x "tools/$rid/"* 2>/dev/null || true
+          done
+          echo "=== tools layout ===" && find tools -type f | sort | sed -n '1,60p'
+          echo "=== per-rid counts ===" && for d in tools/*/; do echo "$d $(ls "$d" | wc -l) files"; done
+
+      - name: Pack Panda3D.Tools
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          dotnet pack csharp/Panda3D.Tools.csproj \
+            -c Release \
+            -p:Version="$VERSION" \
+            -p:ToolsDir="${{ github.workspace }}/tools" \
+            -o nupkg/
+
+      - name: List tools package contents
+        run: unzip -l nupkg/Panda3D.Tools.*.nupkg | sort | sed -n '1,80p'
 
       - uses: actions/upload-artifact@v4
         with:

@@ -1,0 +1,65 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Panda3D.Tools ships every platform's tools under tools/<rid>/; this picks the
+       host RID at build time (Grpc.Tools-style) and exposes the bundle to the
+       consuming project's asset-pipeline targets. -->
+
+  <PropertyGroup>
+    <_P3ToolsPkgRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../tools/'))</_P3ToolsPkgRoot>
+
+    <!-- Host RID: the SDK's portable RID is the most reliable source and already
+         normalizes to linux-x64 / win-x64 / osx-x64 / osx-arm64. -->
+    <_P3HostRid Condition="'$(NETCoreSdkPortableRuntimeIdentifier)' != ''">$(NETCoreSdkPortableRuntimeIdentifier)</_P3HostRid>
+  </PropertyGroup>
+
+  <!-- Fallback: derive from OS + process architecture if the SDK RID is missing or
+       isn't one we ship. -->
+  <PropertyGroup Condition="'$(_P3HostRid)' == '' or !Exists('$(_P3ToolsPkgRoot)$(_P3HostRid)')">
+    <_P3Arch>$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</_P3Arch>
+    <_P3HostRid Condition="$([MSBuild]::IsOSPlatform('Windows'))">win-x64</_P3HostRid>
+    <_P3HostRid Condition="$([MSBuild]::IsOSPlatform('Linux'))">linux-x64</_P3HostRid>
+    <_P3HostRid Condition="$([MSBuild]::IsOSPlatform('OSX')) and '$(_P3Arch)' == 'arm64'">osx-arm64</_P3HostRid>
+    <_P3HostRid Condition="$([MSBuild]::IsOSPlatform('OSX')) and '$(_P3Arch)' != 'arm64'">osx-x64</_P3HostRid>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Directory holding the host platform's tool executables + their libraries. -->
+    <Panda3DToolsDir>$([System.IO.Path]::GetFullPath('$(_P3ToolsPkgRoot)$(_P3HostRid)'))</Panda3DToolsDir>
+    <Panda3DToolExtension Condition="$([MSBuild]::IsOSPlatform('Windows'))">.exe</Panda3DToolExtension>
+    <Panda3DToolsAvailable Condition="Exists('$(Panda3DToolsDir)')">true</Panda3DToolsAvailable>
+  </PropertyGroup>
+
+  <!-- Convenience paths for the common asset tools; any other tool is at
+       $(Panda3DToolsDir)/<name>$(Panda3DToolExtension). -->
+  <PropertyGroup Condition="'$(Panda3DToolsAvailable)' == 'true'">
+    <Panda3DEgg2Bam>$(Panda3DToolsDir)/egg2bam$(Panda3DToolExtension)</Panda3DEgg2Bam>
+    <Panda3DBam2Egg>$(Panda3DToolsDir)/bam2egg$(Panda3DToolExtension)</Panda3DBam2Egg>
+    <Panda3DEggTrans>$(Panda3DToolsDir)/egg-trans$(Panda3DToolExtension)</Panda3DEggTrans>
+    <Panda3DEggOptChar>$(Panda3DToolsDir)/egg-optchar$(Panda3DToolExtension)</Panda3DEggOptChar>
+    <Panda3DEggPalettize>$(Panda3DToolsDir)/egg-palettize$(Panda3DToolExtension)</Panda3DEggPalettize>
+    <Panda3DPZip>$(Panda3DToolsDir)/pzip$(Panda3DToolExtension)</Panda3DPZip>
+    <Panda3DPUnzip>$(Panda3DToolsDir)/punzip$(Panda3DToolExtension)</Panda3DPUnzip>
+    <Panda3DMultify>$(Panda3DToolsDir)/multify$(Panda3DToolExtension)</Panda3DMultify>
+    <Panda3DBamInfo>$(Panda3DToolsDir)/bam-info$(Panda3DToolExtension)</Panda3DBamInfo>
+    <Panda3DImageResize>$(Panda3DToolsDir)/image-resize$(Panda3DToolExtension)</Panda3DImageResize>
+    <Panda3DPView>$(Panda3DToolsDir)/pview$(Panda3DToolExtension)</Panda3DPView>
+    <Panda3DPStats>$(Panda3DToolsDir)/pstats$(Panda3DToolExtension)</Panda3DPStats>
+  </PropertyGroup>
+
+  <!-- NuGet does not preserve the Unix executable bit, so restore the +x on the
+       host tools once per build before anything invokes them. No-op on Windows. -->
+  <Target Name="Panda3DToolsEnsureExecutable"
+          BeforeTargets="BeforeBuild;BeforeCompile"
+          Condition="'$(Panda3DToolsAvailable)' == 'true' and !$([MSBuild]::IsOSPlatform('Windows'))">
+    <Exec Command="chmod -R +x &quot;$(Panda3DToolsDir)&quot;" ContinueOnError="true" />
+  </Target>
+
+  <!-- A missing host bundle is a warning, not an error: a project may reference the
+       package for one platform's CI while building on another. -->
+  <Target Name="Panda3DToolsCheckAvailable"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(Panda3DToolsAvailable)' != 'true'">
+    <Warning Text="Panda3D.Tools: no tool bundle for host RID '$(_P3HostRid)' in this package (looked in '$(Panda3DToolsDir)'). Steps that use $(Panda3DToolsDir) will find no tools." />
+  </Target>
+
+</Project>
