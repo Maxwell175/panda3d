@@ -3,6 +3,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoWarn>$(NoWarn);CS8981</NoWarn>
+    <IsAotCompatible>true</IsAotCompatible>
     <PackageId>Panda3D.Interop</PackageId>
     <Version>1.11.0</Version>
     <Authors>Panda3D</Authors>
