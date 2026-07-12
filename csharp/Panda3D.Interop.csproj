@@ -44,6 +44,9 @@
   <!-- Generated C# sources (platform-independent, produced by interrogate_csharp) -->
   <ItemGroup>
     <Compile Include="$(GeneratedSourcesDir)/**/*.cs" LinkBase="Generated" />
+    <!-- Panda3D.Tools.Tasks is a separate MSBuild-task assembly nested in this dir;
+         the SDK default glob would otherwise pull its sources into the bindings. -->
+    <Compile Remove="Panda3D.Tools.Tasks/**/*.cs" />
   </ItemGroup>
 
   <!-- MSBuild integration targets (transitive import into consuming projects) -->
