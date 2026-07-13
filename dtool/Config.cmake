@@ -301,6 +301,25 @@ if(BUILD_INTERROGATE)
     list(APPEND _interrogate_byproducts "${_interrogate_dir}/bin/interrogate_csharp")
   endif()
 
+  # Forward the parent's macOS arch/SDK/build type; ExternalProject doesn't inherit the cache.
+  set(_interrogate_cmake_args
+    -DHAVE_PYTHON=OFF
+    -DBUILD_SHARED_LIBS=OFF
+    -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
+  )
+  if(CMAKE_OSX_ARCHITECTURES)
+    list(APPEND _interrogate_cmake_args "-DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}")
+  endif()
+  if(CMAKE_OSX_DEPLOYMENT_TARGET)
+    list(APPEND _interrogate_cmake_args "-DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  endif()
+  if(CMAKE_OSX_SYSROOT)
+    list(APPEND _interrogate_cmake_args "-DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}")
+  endif()
+  if(CMAKE_BUILD_TYPE)
+    list(APPEND _interrogate_cmake_args "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
+  endif()
+
   ExternalProject_Add(
     panda3d-interrogate
 
@@ -308,10 +327,7 @@ if(BUILD_INTERROGATE)
     GIT_TAG csharp
 
     PREFIX ${_interrogate_dir}
-    CMAKE_ARGS
-      -DHAVE_PYTHON=OFF
-      -DBUILD_SHARED_LIBS=OFF
-      -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
+    CMAKE_ARGS ${_interrogate_cmake_args}
 
     EXCLUDE_FROM_ALL ON
     BUILD_BYPRODUCTS ${_interrogate_byproducts}
