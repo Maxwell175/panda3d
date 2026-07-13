@@ -39,7 +39,7 @@ public:
   TypedObject *get_result_ptr() const;
   bool add_waiting_task_csharp(AsyncTask *task);
 
-  static PT(AsyncFuture) gather_csharp(AsyncFuture **futures, int count);
+  static PT(AsyncFuture) gather_csharp(const AsyncFuture::Futures &futures);
 };
 
 #endif  // HAVE_CSHARP

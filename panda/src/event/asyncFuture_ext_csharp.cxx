@@ -46,12 +46,14 @@ add_waiting_task_csharp(AsyncTask *task) {
 }
 
 PT(AsyncFuture) Extension<AsyncFuture>::
-gather_csharp(AsyncFuture **futures, int count) {
+gather_csharp(const AsyncFuture::Futures &futures) {
+  // A null entry would be dereferenced when the gathering future adds itself
+  // as a waiter, so skip them.
   AsyncFuture::Futures vec;
-  vec.reserve((size_t)count);
-  for (int i = 0; i < count; ++i) {
-    if (futures[i] != nullptr) {
-      vec.push_back(futures[i]);
+  vec.reserve(futures.size());
+  for (const PT(AsyncFuture) &future : futures) {
+    if (future != nullptr) {
+      vec.push_back(future);
     }
   }
   return AsyncFuture::gather(std::move(vec));

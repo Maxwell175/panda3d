@@ -89,12 +89,15 @@ PUBLISHED:
 
   PY_EXTENSION(void set_result(PyObject *));
 
+  // Declared before gather_csharp() below, which names it.
+  typedef pvector<PT(AsyncFuture)> Futures;
+
   // C# extension methods — implemented in asyncFuture_ext_csharp.cxx.
   CSHARP_EXTENSION(void set_result_none());
   CSHARP_EXTENSION(void set_result_object(TypedObject *result));
   CSHARP_EXTENSION(TypedObject *get_result_ptr() const);
   CSHARP_EXTENSION(bool add_waiting_task_csharp(AsyncTask *task));
-  CSHARP_EXTENSION(static PT(AsyncFuture) gather_csharp(AsyncFuture **futures, int count));
+  CSHARP_EXTENSION(static PT(AsyncFuture) gather_csharp(const Futures &futures));
 public:
   INLINE void set_result(std::nullptr_t);
   INLINE void set_result(TypedReferenceCount *result);
@@ -106,7 +109,6 @@ public:
   INLINE TypedObject *get_result() const;
   INLINE void get_result(TypedObject *&ptr, ReferenceCount *&ref_ptr) const;
 
-  typedef pvector<PT(AsyncFuture)> Futures;
   INLINE static AsyncFuture *gather(Futures futures);
 
   virtual bool is_task() const {return false;}
