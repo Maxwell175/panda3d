@@ -262,6 +262,7 @@ function(interrogate_sources target output database language_flags)
     COMMAND interrogate
       -oc "${output}"
       -od "${database}"
+      -skip-report "${database}.skipped.txt"
       -srcdir "${srcdir}"
       -library ${target}
       ${INTERROGATE_OPTIONS}
@@ -332,6 +333,7 @@ function(_interrogate_csharp_pass2 module stamp dllname module_databases)
       --dllname "${dllname}"
       --ocs "${_cs_output_dir}"
       --search-dir "${CMAKE_BINARY_DIR}/cmake"
+      --skip-report "${stamp_directory}/${module}.skipped.txt"
       ${_module_map_flags}
       ${module_databases}
     COMMAND ${CMAKE_COMMAND} -E touch "${stamp}"
@@ -547,6 +549,7 @@ function(interrogate_csharp_native_sources target output database language_flags
     COMMAND interrogate
       -oc "${output}"
       -od "${database}"
+      -skip-report "${database}.skipped.txt"
       -ocs "${cs_output_dir}"
       -srcdir "${srcdir}"
       -library ${target}
