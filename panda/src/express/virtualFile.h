@@ -57,11 +57,13 @@ PUBLISHED:
   BLOCKING void ls_all(std::ostream &out = std::cout) const;
 
   PY_EXTENSION(PyObject *read_file(bool auto_unwrap) const);
+  CSHARP_EXTENSION(BLOCKING bool read_file_to(std::ostream &out, bool auto_unwrap) const);
   NULLABLE BLOCKING virtual std::istream *open_read_file(bool auto_unwrap) const;
   BLOCKING virtual void close_read_file(NULLABLE std::istream *stream) const;
   virtual bool was_read_successful() const;
 
   PY_EXTENSION(PyObject *write_file(PyObject *data, bool auto_wrap));
+  CSHARP_EXTENSION(BLOCKING bool write_file_from(std::istream &in, bool auto_wrap));
   NULLABLE BLOCKING virtual std::ostream *open_write_file(bool auto_wrap, bool truncate);
   NULLABLE BLOCKING virtual std::ostream *open_append_file();
   BLOCKING virtual void close_write_file(NULLABLE std::ostream *stream);

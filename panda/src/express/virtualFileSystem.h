@@ -99,10 +99,12 @@ PUBLISHED:
   static VirtualFileSystem *get_global_ptr();
 
   PY_EXTENSION(PyObject *read_file(const Filename &filename, bool auto_unwrap) const);
+  CSHARP_EXTENSION(BLOCKING bool read_file_to(const Filename &filename, std::ostream &out, bool auto_unwrap) const);
   NULLABLE BLOCKING std::istream *open_read_file(const Filename &filename, bool auto_unwrap) const;
   BLOCKING static void close_read_file(NULLABLE std::istream *stream);
 
   PY_EXTENSION(PyObject *write_file(const Filename &filename, PyObject *data, bool auto_wrap));
+  CSHARP_EXTENSION(BLOCKING bool write_file_from(const Filename &filename, std::istream &in, bool auto_wrap));
   NULLABLE BLOCKING std::ostream *open_write_file(const Filename &filename, bool auto_wrap, bool truncate);
   NULLABLE BLOCKING std::ostream *open_append_file(const Filename &filename);
   BLOCKING static void close_write_file(NULLABLE std::ostream *stream);

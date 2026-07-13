@@ -145,6 +145,17 @@ set(P3EXPRESS_IGATEEXT
   multifile_ext.I
 )
 
+if(HAVE_CSHARP)
+  set(P3EXPRESS_SOURCES ${P3EXPRESS_SOURCES}
+    virtualFile_ext_csharp.cxx
+    virtualFileSystem_ext_csharp.cxx)
+  set(P3EXPRESS_IGATEEXT ${P3EXPRESS_IGATEEXT}
+    virtualFile_ext_csharp.h
+    virtualFile_ext_csharp.cxx
+    virtualFileSystem_ext_csharp.h
+    virtualFileSystem_ext_csharp.cxx)
+endif()
+
 composite_sources(p3express P3EXPRESS_SOURCES)
 add_component_library(p3express SYMBOL BUILDING_PANDA_EXPRESS
   ${P3EXPRESS_SOURCES} ${P3EXPRESS_HEADERS})
