@@ -196,7 +196,7 @@ jobs:
       - name: Build
         # --config only affects the Windows multi-config generator; single-config
         # Ninja (Linux/macOS) takes its type from CMAKE_BUILD_TYPE above.
-        run: cmake --build build --config ${{ matrix.link == 'shared' && 'Standard' || 'Release' }} --parallel 8
+        run: cmake --build build --config ${{ matrix.link == 'shared' && 'Standard' || 'Release' }}
 
       - name: Patch shared library metadata
         if: runner.os != 'Windows' && matrix.link == 'shared'
