@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.crt || 'default' }}-v2-${{ matrix.os }}
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.crt || 'default' }}-v3-mimalloc343-${{ matrix.os }}
 
       - name: Install yasm
         if: runner.os != 'Windows' && steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
@@ -47,6 +47,19 @@ jobs:
         if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true' && matrix.crt == 'mt'
         shell: bash
         run: git -C thirdparty apply ../.github/patches/thirdparty-msvc-mt.patch
+
+      # The thirdparty repo pins mimalloc v2.1.6 ("latest version to support CMake 3.13").
+      # All CI runners ship CMake >= 3.18, so build the latest mimalloc (v3.4.3) instead.
+      - name: Use latest mimalloc in thirdparty build
+        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          OLD=6141843614220c4d85f55774c131a68ba778e413
+          NEW=442e5fa3ea72709ed2ee0c29fd289fe15f6f7318
+          sed -i.bak "s|GIT_TAG ${OLD} # v2.1.6|GIT_TAG ${NEW} # v3.4.3|" thirdparty/CMakeLists.txt
+          rm -f thirdparty/CMakeLists.txt.bak
+          grep -q "GIT_TAG ${NEW}" thirdparty/CMakeLists.txt || { echo "::error::mimalloc tag not bumped — the thirdparty pin may have changed"; exit 1; }
+          grep -n -A1 'mimalloc.git' thirdparty/CMakeLists.txt
 
       - name: Configure
         if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
@@ -113,7 +126,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.thirdparty_crt || 'default' }}-v2-${{ matrix.os }}
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.thirdparty_crt || 'default' }}-v3-mimalloc343-${{ matrix.os }}
           fail-on-cache-miss: true
 
       - name: Install build tools (Linux)
@@ -158,6 +171,7 @@ jobs:
             -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.link == 'shared' && 'Standard' || 'Release' }} \
             -DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} \
+            -DUSE_MEMORY_MIMALLOC=ON \
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
             -DHAVE_PYTHON=NO \
@@ -172,6 +186,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.link == 'shared' && 'Standard' || 'Release' }} \
             -DCMAKE_OSX_ARCHITECTURES=${{ matrix.cmake_osx_arch }} \
             -DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }} \
+            -DUSE_MEMORY_MIMALLOC=ON \
             -DINTERROGATE_CSHARP_INTERFACE=ON \
             -DBUILD_INTERROGATE=ON \
             -DHAVE_PYTHON=NO \
@@ -186,7 +201,7 @@ jobs:
             -G "Visual Studio 17 2022" -A x64 `
             "-DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }}" `
             "-DCMAKE_MSVC_RUNTIME_LIBRARY=${{ matrix.link == 'static' && 'MultiThreaded' || 'MultiThreadedDLL' }}" `
-            -DHAVE_MIMALLOC=OFF `
+            -DUSE_MEMORY_MIMALLOC=ON `
             -DINTERROGATE_CSHARP_INTERFACE=ON `
             -DBUILD_INTERROGATE=ON `
             -DHAVE_PYTHON=NO `
