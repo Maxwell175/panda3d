@@ -230,8 +230,11 @@ set_property(DIRECTORY "${PROJECT_SOURCE_DIR}" APPEND PROPERTY
   COMPILE_DEFINITIONS "$<${cxx_rtti_property}:HAVE_RTTI>")
 
 if(MSVC)
-  set(msvc_bigobj_property "$<BOOL:$<TARGET_PROPERTY:MSVC_BIGOBJ>>")
-  add_compile_options("$<${msvc_bigobj_property}:/bigobj>")
+  # Unity builds (CMAKE_UNITY_BUILD, batch size 30) merge many translation units into one
+  # object, which pushes far more targets than the few Eigen-heavy ones past the COFF
+  # section limit (fatal error C1128). /bigobj is safe everywhere, so enable it globally
+  # rather than per-target via the MSVC_BIGOBJ property.
+  add_compile_options(/bigobj)
 endif()
 
 # We should use -fvisibility=hidden everywhere, as it makes sure we think
