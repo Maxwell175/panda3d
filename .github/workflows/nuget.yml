@@ -158,7 +158,7 @@ jobs:
 
       - name: Install build tools (Windows)
         if: runner.os == 'Windows'
-        run: choco install winflexbison3 --yes
+        run: choco install winflexbison3 ninja --yes
 
       - name: Configure (Linux)
         if: runner.os == 'Linux'
@@ -193,12 +193,22 @@ jobs:
             -DBUILD_METALIBS=YES \
             -DDEFAULT_PRC_DIR="<auto>etc"
 
-      - name: Configure (Windows)
+      # Ninja + MSVC parallelizes across all cores, unlike the serial MSBuild the Visual
+      # Studio generator used (which made Windows a ~1h outlier). Enter-VsDevShell puts
+      # cl.exe / INCLUDE / LIB on PATH for this step; configure and build run together here
+      # because that environment does not persist to later steps. Ninja is single-config, so
+      # outputs land in build/{bin,lib} (not build/<config>/...) — see the collect steps.
+      - name: Configure and build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $installPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          Import-Module (Join-Path $installPath "Common7\Tools\Microsoft.VisualStudio.DevShell.dll")
+          Enter-VsDevShell -VsInstallPath $installPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
           cmake -B build `
-            -G "Visual Studio 17 2022" -A x64 `
+            -G Ninja `
+            "-DCMAKE_BUILD_TYPE=${{ matrix.link == 'shared' && 'Standard' || 'Release' }}" `
             "-DBUILD_SHARED_LIBS=${{ matrix.link == 'shared' && 'ON' || 'OFF' }}" `
             "-DCMAKE_MSVC_RUNTIME_LIBRARY=${{ matrix.link == 'static' && 'MultiThreaded' || 'MultiThreadedDLL' }}" `
             -DUSE_MEMORY_MIMALLOC=ON `
@@ -207,10 +217,11 @@ jobs:
             -DHAVE_PYTHON=NO `
             -DBUILD_METALIBS=YES `
             '-DDEFAULT_PRC_DIR=<auto>etc'
+          cmake --build build
 
       - name: Build
-        # --config only affects the Windows multi-config generator; single-config
-        # Ninja (Linux/macOS) takes its type from CMAKE_BUILD_TYPE above.
+        if: runner.os != 'Windows'
+        # Single-config Ninja takes its build type from CMAKE_BUILD_TYPE; --config is ignored.
         run: cmake --build build --config ${{ matrix.link == 'shared' && 'Standard' || 'Release' }}
 
       - name: Patch shared library metadata
@@ -288,7 +299,7 @@ jobs:
             # Non-recursive: only the CMake archive output dir, not per-target
             # OBJECT-library intermediates that duplicate
             # the metalib archives.
-            Get-ChildItem build\Release\lib -Filter '*.lib' |
+            Get-ChildItem build\lib -Filter '*.lib' |
               Where-Object { $_.Name -notmatch 'igate' } |
               Copy-Item -Destination dist\ -ErrorAction SilentlyContinue
           }
@@ -326,12 +337,11 @@ jobs:
         shell: pwsh
         run: |
           New-Item tools-dist -ItemType Directory -Force
-          # VS multi-config emits the exes + their DLLs under build\<Config>\bin (not
-          # build\bin). Shared builds are configured Standard, so that's the dir here.
-          Get-ChildItem build\Standard\bin -Filter *.exe |
+          # Single-config Ninja emits the exes + their DLLs under build\bin.
+          Get-ChildItem build\bin -Filter *.exe |
             Where-Object { $_.BaseName -notmatch '^(cycler_bench|ebr_cycler|scenegraph_bench|scenegraph_stress)$' } |
             Copy-Item -Destination tools-dist\
-          Get-ChildItem build\Standard\bin -Filter *.dll |
+          Get-ChildItem build\bin -Filter *.dll |
             Where-Object { $_.Name -notmatch 'igate' -and $_.Name -notmatch 'supplemental' } |
             Copy-Item -Destination tools-dist\ -ErrorAction SilentlyContinue
           Get-ChildItem tools-dist\
