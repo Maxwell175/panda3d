@@ -172,3 +172,42 @@ public partial class LMatrix4d {
     row3 = GetRow(3);
   }
 }
+
+// --- ToString: readable component/row form for debugging and logging ---------------------
+// LPoint*, LVector*, LColor*, and LQuaternion* derive from these LVecBase* types, so they
+// inherit these overrides. Matrix rows reuse the vector form and are disposed after
+// formatting, so ToString leaves no native temporaries behind.
+public partial class LVecBase2f { public override string ToString() => $"({X}, {Y})"; }
+public partial class LVecBase2d { public override string ToString() => $"({X}, {Y})"; }
+public partial class LVecBase2i { public override string ToString() => $"({X}, {Y})"; }
+public partial class LVecBase3f { public override string ToString() => $"({X}, {Y}, {Z})"; }
+public partial class LVecBase3d { public override string ToString() => $"({X}, {Y}, {Z})"; }
+public partial class LVecBase3i { public override string ToString() => $"({X}, {Y}, {Z})"; }
+public partial class LVecBase4f { public override string ToString() => $"({X}, {Y}, {Z}, {W})"; }
+public partial class LVecBase4d { public override string ToString() => $"({X}, {Y}, {Z}, {W})"; }
+public partial class LVecBase4i { public override string ToString() => $"({X}, {Y}, {Z}, {W})"; }
+
+public partial class LMatrix3f {
+  public override string ToString() {
+    using var r0 = GetRow(0); using var r1 = GetRow(1); using var r2 = GetRow(2);
+    return $"[{r0}, {r1}, {r2}]";
+  }
+}
+public partial class LMatrix3d {
+  public override string ToString() {
+    using var r0 = GetRow(0); using var r1 = GetRow(1); using var r2 = GetRow(2);
+    return $"[{r0}, {r1}, {r2}]";
+  }
+}
+public partial class LMatrix4f {
+  public override string ToString() {
+    using var r0 = GetRow(0); using var r1 = GetRow(1); using var r2 = GetRow(2); using var r3 = GetRow(3);
+    return $"[{r0}, {r1}, {r2}, {r3}]";
+  }
+}
+public partial class LMatrix4d {
+  public override string ToString() {
+    using var r0 = GetRow(0); using var r1 = GetRow(1); using var r2 = GetRow(2); using var r3 = GetRow(3);
+    return $"[{r0}, {r1}, {r2}, {r3}]";
+  }
+}

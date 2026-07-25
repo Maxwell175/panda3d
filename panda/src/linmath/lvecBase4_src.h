@@ -84,6 +84,7 @@ PUBLISHED:
   MAKE_PROPERTY(x, get_x, set_x);
   MAKE_PROPERTY(y, get_y, set_y);
   MAKE_PROPERTY(z, get_z, set_z);
+  MAKE_PROPERTY(w, get_w, set_w);
 
   MAKE_PROPERTY(xyz, get_xyz);
   MAKE_PROPERTY(xy, get_xy);
