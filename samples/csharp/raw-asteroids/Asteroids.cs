@@ -38,14 +38,14 @@ namespace Panda3D.RawAsteroids {
     }
 
     private sealed class BulletState {
-      public INodePath Node = null!;
+      public NodePath Node = null!;
       public float VX;
       public float VZ;
       public double ExpiresAt;
     }
 
     private sealed class AsteroidState {
-      public INodePath Node = null!;
+      public NodePath Node = null!;
       public ITexture Texture = null!;
       public float VX;
       public float VZ;
@@ -55,19 +55,19 @@ namespace Panda3D.RawAsteroids {
     private static readonly List<BulletState> Bullets = new();
     private static readonly List<AsteroidState> Asteroids = new();
 
-    private static IGraphicsEngine engine = null!;
-    private static IGraphicsWindow window = null!;
+    private static GraphicsEngine engine = null!;
+    private static GraphicsWindow window = null!;
     private static ILoader loader = null!;
-    private static IClockObject clock = null!;
+    private static ClockObject clock = null!;
     private static Randomizer random = null!;
 
-    private static INodePath render = null!;
-    private static INodePath cameraRoot = null!;
-    private static INodePath aspect2d = null!;
-    private static INodePath planeModel = null!;
-    private static INodePath background = null!;
-    private static INodePath ship = null!;
-    private static INodePath statusLabel = null!;
+    private static NodePath render = null!;
+    private static NodePath cameraRoot = null!;
+    private static NodePath aspect2d = null!;
+    private static NodePath planeModel = null!;
+    private static NodePath background = null!;
+    private static NodePath ship = null!;
+    private static NodePath statusLabel = null!;
     private static TextNode statusText = null!;
 
     private static ITexture backgroundTexture = null!;
@@ -75,7 +75,7 @@ namespace Panda3D.RawAsteroids {
     private static ITexture bulletTexture = null!;
     private static readonly List<ITexture> asteroidTextures = new();
 
-    private static INodePath dataRoot = null!;
+    private static NodePath dataRoot = null!;
     private static IMouseWatcher mouseWatcher = null!;
     private static int leftButton;
     private static int rightButton;
@@ -103,7 +103,7 @@ namespace Panda3D.RawAsteroids {
 
     private static void Initialize() {
       engine = GraphicsEngine.GetGlobalPtr();
-      IGraphicsPipe pipe = GraphicsPipeSelection.GetGlobalPtr().MakeDefaultPipe();
+      GraphicsPipe pipe = GraphicsPipeSelection.GetGlobalPtr().MakeDefaultPipe();
       if (pipe == null) {
         throw new InvalidOperationException("No graphics pipe available.");
       }
@@ -114,13 +114,13 @@ namespace Panda3D.RawAsteroids {
       fbProp.SetDepthBits(24);
       fbProp.SetBackBuffers(1);
 
-      IWindowProperties winProp = WindowProperties.GetDefault();
+      WindowProperties winProp = WindowProperties.GetDefault();
       winProp.SetSize(800, 600);
       winProp.SetTitle("Panda3D C# Asteroids");
 
       IGraphicsOutput output = engine.MakeOutput(
         pipe, "window", 0, fbProp, winProp,
-        (int)GraphicsPipe_BufferCreationFlags.BF_require_window);
+        (int)GraphicsPipeBufferCreationFlags.BfRequireWindow);
       if (output == null) {
         throw new InvalidOperationException("MakeOutput returned null.");
       }
@@ -149,7 +149,7 @@ namespace Panda3D.RawAsteroids {
       aspect2d = new NodePath("aspect2d");
       aspect2d.SetDepthTest(false);
       aspect2d.SetDepthWrite(false);
-      aspect2d.SetTransparency(TransparencyAttrib_Mode.M_alpha);
+      aspect2d.SetTransparency(TransparencyAttribMode.MAlpha);
       aspect2d.SetBin("unsorted", 0);
       var cam2d = new Camera("camera2d");
       var lens2d = new OrthographicLens();
@@ -157,7 +157,7 @@ namespace Panda3D.RawAsteroids {
       lens2d.SetNearFar(-1000.0f, 1000.0f);
       cam2d.SetLens(lens2d);
       cam2d.SetScene(aspect2d);
-      INodePath cam2dNp = aspect2d.AttachNewNode(cam2d);
+      NodePath cam2dNp = aspect2d.AttachNewNode(cam2d);
       IDisplayRegion dr2d = output.MakeDisplayRegion();
       dr2d.SetSort(10);
       dr2d.SetCamera(cam2dNp);
@@ -198,18 +198,18 @@ namespace Panda3D.RawAsteroids {
       ship.SetR(0.0f);
 
       float ar = 800.0f / 600.0f;
-      Create2dLabel("title", "Panda3D: Tutorial - Tasks", ar - 0.1f, -1.0f + 0.1f, 0.07f, TextProperties_Alignment.A_right);
-      Create2dLabel("esc", "ESC: Quit", -ar + 0.07f, 1.0f - 0.1f, 0.05f, TextProperties_Alignment.A_left);
-      Create2dLabel("left", "[Left Arrow]: Turn Left (CCW)", -ar + 0.07f, 1.0f - 0.16f, 0.05f, TextProperties_Alignment.A_left);
-      Create2dLabel("right", "[Right Arrow]: Turn Right (CW)", -ar + 0.07f, 1.0f - 0.22f, 0.05f, TextProperties_Alignment.A_left);
-      Create2dLabel("up", "[Up Arrow]: Accelerate", -ar + 0.07f, 1.0f - 0.28f, 0.05f, TextProperties_Alignment.A_left);
-      Create2dLabel("space", "[Space Bar]: Fire", -ar + 0.07f, 1.0f - 0.34f, 0.05f, TextProperties_Alignment.A_left);
+      Create2dLabel("title", "Panda3D: Tutorial - Tasks", ar - 0.1f, -1.0f + 0.1f, 0.07f, TextPropertiesAlignment.ARight);
+      Create2dLabel("esc", "ESC: Quit", -ar + 0.07f, 1.0f - 0.1f, 0.05f, TextPropertiesAlignment.ALeft);
+      Create2dLabel("left", "[Left Arrow]: Turn Left (CCW)", -ar + 0.07f, 1.0f - 0.16f, 0.05f, TextPropertiesAlignment.ALeft);
+      Create2dLabel("right", "[Right Arrow]: Turn Right (CW)", -ar + 0.07f, 1.0f - 0.22f, 0.05f, TextPropertiesAlignment.ALeft);
+      Create2dLabel("up", "[Up Arrow]: Accelerate", -ar + 0.07f, 1.0f - 0.28f, 0.05f, TextPropertiesAlignment.ALeft);
+      Create2dLabel("space", "[Space Bar]: Fire", -ar + 0.07f, 1.0f - 0.34f, 0.05f, TextPropertiesAlignment.ALeft);
       string mode = RuntimeFeature.IsDynamicCodeCompiled ? "Shared" : "NativeAOT Static";
-      Create2dLabel("engine", $"Panda3D C# \u2022 {mode}", -ar + 0.07f, 1.0f - 0.42f, 0.04f, TextProperties_Alignment.A_left);
+      Create2dLabel("engine", $"Panda3D C# \u2022 {mode}", -ar + 0.07f, 1.0f - 0.42f, 0.04f, TextPropertiesAlignment.ALeft);
 
       statusText = new TextNode("status");
       FrameworkBindings.SetText(statusText, string.Empty);
-      statusText.SetAlign(TextProperties_Alignment.A_center);
+      statusText.SetAlign(TextPropertiesAlignment.ACenter);
       var color = new LVecBase4f(1.0f, 1.0f, 1.0f, 1.0f);
       statusText.SetTextColor(color);
       var shadow = new LVecBase4f(0.0f, 0.0f, 0.0f, 0.5f);
@@ -227,7 +227,7 @@ namespace Panda3D.RawAsteroids {
       dataRoot = new NodePath("data");
 
       var mouseNode = new MouseAndKeyboard(window, 0, "mouse");
-      INodePath mouse = dataRoot.AttachNewNode(mouseNode);
+      NodePath mouse = dataRoot.AttachNewNode(mouseNode);
 
       mouseWatcher = new MouseWatcher("watcher");
       mouse.AttachNewNode(mouseWatcher);
@@ -331,7 +331,7 @@ namespace Panda3D.RawAsteroids {
 
     private static void Fire(double time) {
       float direction = ship.GetR() * DegToRad;
-      INodePath bulletNode = LoadObject(bulletTexture, 0.2f, ship.GetX(), ship.GetZ(), SpritePos, true);
+      NodePath bulletNode = LoadObject(bulletTexture, 0.2f, ship.GetX(), ship.GetZ(), SpritePos, true);
       Bullets.Add(new BulletState {
         Node = bulletNode,
         VX = ShipVelocity.X + MathF.Sin(direction) * BulletSpeed,
@@ -340,7 +340,7 @@ namespace Panda3D.RawAsteroids {
       });
     }
 
-    private static void UpdatePos(INodePath obj, float vx, float vz, float dt) {
+    private static void UpdatePos(NodePath obj, float vx, float vz, float dt) {
       float x = obj.GetX() + vx * dt;
       float z = obj.GetZ() + vz * dt;
       float radius = obj.GetSx() * 0.5f;
@@ -437,7 +437,7 @@ namespace Panda3D.RawAsteroids {
 
       for (int i = 0; i < 10; ++i) {
         ITexture texture = asteroidTextures[random.RandomInt(asteroidTextures.Count)];
-        INodePath asteroidNode = LoadObject(texture, AstInitScale, 0.0f, 0.0f, SpritePos, true);
+        NodePath asteroidNode = LoadObject(texture, AstInitScale, 0.0f, 0.0f, SpritePos, true);
 
         int xChoice = random.RandomInt(((int)ScreenX + 1) * 2 - 9) - (int)ScreenX;
         if (xChoice >= -4) xChoice += 9;
@@ -461,7 +461,7 @@ namespace Panda3D.RawAsteroids {
       AsteroidState asteroid = Asteroids[index];
       float oldScale;
       var scale = asteroid.Node.GetScale();
-        oldScale = scale.GetX();
+        oldScale = scale.X;
 
       if (oldScale <= AstMinScale) {
         asteroid.Node.RemoveNode();
@@ -481,7 +481,7 @@ namespace Panda3D.RawAsteroids {
       asteroid.VX = dirX / dirLen * speed;
       asteroid.VZ = dirZ / dirLen * speed;
 
-      INodePath newAst = LoadObject(asteroid.Texture, newScale, 0.0f, 0.0f, SpritePos, true);
+      NodePath newAst = LoadObject(asteroid.Texture, newScale, 0.0f, 0.0f, SpritePos, true);
       SetPos(newAst, asteroid.Node.GetX(), asteroid.Node.GetY(), asteroid.Node.GetZ());
 
       Asteroids.Add(new AsteroidState {
@@ -492,21 +492,21 @@ namespace Panda3D.RawAsteroids {
       });
     }
 
-    private static INodePath LoadObject(ITexture texture, float scale, float x, float z, float depth, bool transparency) {
-      INodePath obj = planeModel.CopyTo(cameraRoot);
+    private static NodePath LoadObject(ITexture texture, float scale, float x, float z, float depth, bool transparency) {
+      NodePath obj = planeModel.CopyTo(cameraRoot);
       SetPos(obj, x, depth, z);
       SetScale(obj, scale);
       obj.SetBin("unsorted", 0);
       obj.SetDepthTest(false);
       if (transparency) {
-        obj.SetTransparency((TransparencyAttrib_Mode)1);
+        obj.SetTransparency(TransparencyAttribMode.MAlpha);
       }
       obj.SetTexture(texture, 1);
       return obj;
     }
 
-    private static INodePath LoadModel(string path) {
-      IFilename file = Filename.FromOsSpecific(path);
+    private static NodePath LoadModel(string path) {
+      Filename file = path;
       IPandaNode node = loader.LoadSync(file);
       if (node == null) {
         throw new InvalidOperationException("Could not load model: " + path);
@@ -515,17 +515,17 @@ namespace Panda3D.RawAsteroids {
     }
 
     private static ITexture LoadTexture(string path) {
-      IFilename file = Filename.FromOsSpecific(path);
+      Filename file = path;
       ITexture texture = TexturePool.LoadTexture(file);
       if (texture == null) {
         throw new InvalidOperationException("Could not load texture: " + path);
       }
-      texture.SetWrapU(SamplerState_WrapMode.WM_clamp);
-      texture.SetWrapV(SamplerState_WrapMode.WM_clamp);
+      texture.SetWrapU(SamplerStateWrapMode.WmClamp);
+      texture.SetWrapV(SamplerStateWrapMode.WmClamp);
       return texture;
     }
 
-    private static INodePath Create2dLabel(string name, string text, float x, float z, float scale, TextProperties_Alignment align) {
+    private static NodePath Create2dLabel(string name, string text, float x, float z, float scale, TextPropertiesAlignment align) {
       var textNode = new TextNode(name);
       FrameworkBindings.SetText(textNode, text);
       textNode.SetAlign(align);
@@ -539,7 +539,7 @@ namespace Panda3D.RawAsteroids {
       textNode.SetBin("fixed");
       textNode.SetDrawOrder(0);
       IPandaNode baked = textNode.Generate();
-      INodePath path = aspect2d.AttachNewNode(baked);
+      NodePath path = aspect2d.AttachNewNode(baked);
       var pos = new LPoint3f(x, 0.0f, z);
       path.SetPos(pos);
       var s = new LVecBase3f(scale, scale, scale);
@@ -551,7 +551,7 @@ namespace Panda3D.RawAsteroids {
       FrameworkBindings.SetText(statusText, text);
     }
 
-    private static void SetVelocity(INodePath obj, float vx, float vz) {
+    private static void SetVelocity(NodePath obj, float vx, float vz) {
       if (ReferenceEquals(obj, ship)) {
         ShipVelocity.X = vx;
         ShipVelocity.Z = vz;
@@ -563,12 +563,12 @@ namespace Panda3D.RawAsteroids {
       return mouseWatcher.IsButtonDown(button);
     }
 
-    private static void SetPos(INodePath node, float x, float y, float z) {
+    private static void SetPos(NodePath node, float x, float y, float z) {
       using var pos = new LPoint3f(x, y, z);
       node.SetPos(pos);
     }
 
-    private static void SetScale(INodePath node, float scale) {
+    private static void SetScale(NodePath node, float scale) {
       using var value = new LVecBase3f(scale, scale, scale);
       node.SetScale(value);
     }
