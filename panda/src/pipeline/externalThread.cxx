@@ -16,25 +16,7 @@
 TypeHandle ExternalThread::_type_handle;
 
 /**
- * This constructor is used to create the one global ExternalThread object
- * that is shared by all externally-created threads that are not specifically
- * bound to a particular Thread object.
- */
-ExternalThread::
-ExternalThread() : Thread("External", "External") {
-  init_type();  // in case static init comes in the wrong order
-  _started = true;
-#ifdef THREADED_PIPELINE
-  // The shared singleton stands in for all unbound external threads; it takes
-  // its single stage occupancy when created (already "running", unlike a
-  // started thread that acquires in its root wrapper).
-  acquire_stage_occupancy();
-#endif
-}
-
-/**
- * This constructor is used to create the particular Thread object for each
- * external thread that is bound via Thread::bind_thread().
+ * Creates the Thread object for one external OS thread.
  */
 ExternalThread::
 ExternalThread(const std::string &name, const std::string &sync_name) :
@@ -42,8 +24,7 @@ ExternalThread(const std::string &name, const std::string &sync_name) :
 {
   _started = true;
 #ifdef THREADED_PIPELINE
-  // Bound external threads are already running; acquire occupancy in the ctor,
-  // which runs on the external thread being bound.
+  // Already running on the external thread, so take occupancy now.
   acquire_stage_occupancy();
 #endif
 }

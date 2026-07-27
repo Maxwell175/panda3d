@@ -25,6 +25,22 @@
 static thread_local Thread *_current_thread = nullptr;
 static patomic_flag _main_thread_known = ATOMIC_FLAG_INIT;
 
+// An auto-bound external thread's Thread is held here and released when the OS
+// thread exits.  _thread_tearing_down stops that teardown from re-minting a
+// thread into the holder that is already destructing (see init_current_thread).
+static thread_local bool _thread_tearing_down = false;
+
+namespace {
+  struct BoundThreadHolder {
+    PT(Thread) thread;
+    ~BoundThreadHolder() {
+      _thread_tearing_down = true;
+      thread = nullptr;
+    }
+  };
+}
+static thread_local BoundThreadHolder _bound_thread;
+
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #endif
@@ -53,23 +69,28 @@ static bool init_thread_profiling() {
 #endif
 
 /**
- * Called by get_current_thread() if the current thread pointer is null; checks
- * whether it might be the main thread.
+ * Resolves this OS thread's Thread object on first use.  The first caller in
+ * the process is the main thread; any other foreign thread is auto-bound to its
+ * own ExternalThread, so distinct OS threads never share an epoch participant.
  * Note that adding noinline speeds up this call *significantly*, don't remove!
  */
 static __declspec(noinline) Thread *
 init_current_thread() {
-  Thread *thread = _current_thread;
-  if (!_main_thread_known.test_and_set(std::memory_order_relaxed)) {
-    // Assume that we must be in the main thread, since this method must be
-    // called before the first thread is spawned.
-    thread = Thread::get_main_thread();
-    _current_thread = thread;
+  if (_current_thread != nullptr) {
+    return _current_thread;
   }
-  // If this assertion triggers, you are making Panda calls from a thread
-  // that has not first been registered using Thread::bind_thread().
-  nassertr(thread != nullptr, nullptr);
-  return thread;
+  if (!_main_thread_known.test_and_set(std::memory_order_relaxed)) {
+    _current_thread = Thread::get_main_thread();
+    return _current_thread;
+  }
+  // Teardown re-entrancy: don't mint into a holder that is destructing.
+  if (_thread_tearing_down) {
+    return Thread::get_main_thread();
+  }
+  PT(Thread) ext = Thread::make_current_external();
+  _current_thread = ext.p();
+  _bound_thread.thread = std::move(ext);
+  return _current_thread;
 }
 
 /**
@@ -79,6 +100,10 @@ ThreadWin32Impl::
 ~ThreadWin32Impl() {
   if (thread_cat->is_debug()) {
     thread_cat.debug() << "Deleting thread " << _parent_obj->get_name() << "\n";
+  }
+
+  if (_current_thread == _parent_obj) {
+    _current_thread = nullptr;
   }
 
   CloseHandle(_thread);
@@ -199,13 +224,28 @@ get_current_thread() {
  */
 Thread *ThreadWin32Impl::
 bind_thread(Thread *thread) {
-  if (_current_thread != nullptr) {
-    return _current_thread;
+  Thread *current = _current_thread;
+  if (current != nullptr) {
+    // Never replace the main thread or a Panda-started thread.
+    if (!current->is_auto_bound()) {
+      return current;
+    }
+    // Supersede the existing external binding; unsafe mid critical section.
+    // Set _current_thread first, so releasing the old holder ref does not
+    // clear it (see ~ThreadWin32Impl).
+#ifdef THREADED_PIPELINE
+    nassertr(current->epoch_participant().depth == 0, current);
+#endif
+    _current_thread = thread;
+    _bound_thread.thread = thread;
+    return thread;
   }
+
   if (thread == Thread::get_main_thread()) {
     _main_thread_known.test_and_set(std::memory_order_relaxed);
   }
   _current_thread = thread;
+  _bound_thread.thread = thread;
   return thread;
 }
 

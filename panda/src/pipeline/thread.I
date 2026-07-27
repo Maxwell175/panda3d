@@ -93,28 +93,9 @@ get_main_thread() {
 }
 
 /**
- * Returns a pointer to the "external" Thread object--this is a special Thread
- * object that corresponds to any thread spawned outside of Panda's threading
- * interface.  Note that multiple different threads may share this same
- * pointer.
- */
-INLINE Thread *Thread::
-get_external_thread() {
-  if (_external_thread == nullptr) {
-    init_external_thread();
-  }
-  return _external_thread;
-}
-
-/**
  * Returns a pointer to the currently-executing Thread object.  If this is
  * called from the main thread, this will return the same value as
  * get_main_thread().
- *
- * This will always return some valid Thread pointer.  It will never return
- * NULL, even if the current thread was spawned outside of Panda's threading
- * system, although all non-Panda threads will return the exact same Thread
- * pointer.
  */
 INLINE Thread *Thread::
 get_current_thread() {
@@ -122,11 +103,7 @@ get_current_thread() {
 #ifndef HAVE_THREADS
   return get_main_thread();
 #else  // HAVE_THREADS
-  Thread *thread = ThreadImpl::get_current_thread();
-  if (thread == nullptr) {
-    return Thread::get_external_thread();
-  }
-  return thread;
+  return ThreadImpl::get_current_thread();
 #endif  // HAVE_THREADS
 }
 
@@ -418,3 +395,23 @@ assert_in_epoch(Thread *t, unsigned int own_depth) {
 }
 
 #endif  // THREADED_PIPELINE
+
+/**
+ *
+ */
+INLINE void Thread::
+begin_epoch() {
+#ifdef THREADED_PIPELINE
+  get_current_thread()->epoch_enter();
+#endif
+}
+
+/**
+ *
+ */
+INLINE void Thread::
+end_epoch() {
+#ifdef THREADED_PIPELINE
+  get_current_thread()->epoch_leave();
+#endif
+}

@@ -20,7 +20,6 @@
 #include "conditionVarDebug.h"
 
 Thread *Thread::_main_thread;
-Thread *Thread::_external_thread;
 TypeHandle Thread::_type_handle;
 
 void (*Thread::_sleep_func)(double) = &ThreadImpl::sleep;
@@ -284,14 +283,12 @@ init_main_thread() {
 }
 
 /**
- * Creates the Thread object that represents all of the external threads.
+ * Mints a fresh ExternalThread for the current (foreign) OS thread, returned
+ * with refcount 0; the calling ThreadImpl adopts it into a thread-local PT.
  */
-void Thread::
-init_external_thread() {
-  if (_external_thread == nullptr) {
-    _external_thread = new ExternalThread;
-    _external_thread->ref();
-  }
+Thread *Thread::
+make_current_external() {
+  return new ExternalThread("External", "External");
 }
 
 /**

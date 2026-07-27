@@ -72,7 +72,6 @@ PUBLISHED:
   INLINE void set_min_pipeline_stage(int min_pipeline_stage);
 
   INLINE static Thread *get_main_thread();
-  INLINE static Thread *get_external_thread();
   INLINE static Thread *get_current_thread();
   INLINE static int get_current_pipeline_stage();
   INLINE static bool is_threading_supported();
@@ -103,6 +102,11 @@ PUBLISHED:
 
   INLINE static void prepare_for_exit();
 
+  // Manual EBR epoch framing for the current thread (nestable); no-ops without
+  // a threaded pipeline.
+  INLINE static void begin_epoch();
+  INLINE static void end_epoch();
+
   MAKE_PROPERTY(sync_name, get_sync_name);
   MAKE_PROPERTY(pstats_index, get_pstats_index);
   MAKE_PROPERTY(python_index, get_python_index);
@@ -110,7 +114,6 @@ PUBLISHED:
   MAKE_PROPERTY(pipeline_stage, get_pipeline_stage, set_pipeline_stage);
 
   MAKE_PROPERTY(main_thread, get_main_thread);
-  MAKE_PROPERTY(external_thread, get_external_thread);
   MAKE_PROPERTY(current_thread, get_current_thread);
   MAKE_PROPERTY(current_pipeline_stage, get_current_pipeline_stage);
 
@@ -141,13 +144,20 @@ public:
   // this should be overridden to return false.
   virtual bool reads_pipeline() const { return true; }
 
+  // True for an ExternalThread (a thread Panda did not create); false for the
+  // main thread and Panda-started threads.
+  virtual bool is_auto_bound() const { return false; }
+
+  // Mints an ExternalThread for the current (foreign) OS thread; refcount 0 on
+  // return, so the calling ThreadImpl must adopt it into a PT immediately.
+  static Thread *make_current_external();
+
 #ifdef ANDROID
   INLINE JNIEnv *get_jni_env() const;
 #endif
 
 private:
   static void init_main_thread();
-  static void init_external_thread();
 
 protected:
   bool _started;
@@ -197,7 +207,6 @@ private:
 
 private:
   static Thread *_main_thread;
-  static Thread *_external_thread;
 
 #ifdef THREADED_PIPELINE
   EpochParticipant _epoch_participant;

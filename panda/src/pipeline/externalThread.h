@@ -18,14 +18,17 @@
 #include "thread.h"
 
 /**
- * The special "external thread" class.  There is one instance of these in the
- * world, and it is returned by Thread::get_external_thread().
+ * The Thread object for a thread Panda did not create.  One is minted per
+ * external OS thread (lazily on first get_current_thread(), or via
+ * Thread::bind_thread()), so each has its own Thread and epoch participant.
  */
 class EXPCL_PANDA_PIPELINE ExternalThread : public Thread {
 private:
-  ExternalThread();
   ExternalThread(const std::string &name, const std::string &sync_name);
   virtual void thread_main();
+
+public:
+  virtual bool is_auto_bound() const { return true; }
 
 PUBLISHED:
   static TypeHandle get_class_type() {

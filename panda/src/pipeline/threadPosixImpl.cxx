@@ -41,6 +41,22 @@ __thread Thread *ThreadPosixImpl::_current_thread = nullptr;
 #endif
 static patomic_flag _main_thread_known = ATOMIC_FLAG_INIT;
 
+// An auto-bound external thread's Thread is held here and released when the OS
+// thread exits.  _thread_tearing_down stops that teardown from re-minting a
+// thread into the holder that is already destructing (see init_current_thread).
+static thread_local bool _thread_tearing_down = false;
+
+namespace {
+  struct BoundThreadHolder {
+    PT(Thread) thread;
+    ~BoundThreadHolder() {
+      _thread_tearing_down = true;
+      thread = nullptr;
+    }
+  };
+}
+static thread_local BoundThreadHolder _bound_thread;
+
 /**
  *
  */
@@ -208,13 +224,28 @@ get_unique_id() const {
  */
 Thread *ThreadPosixImpl::
 bind_thread(Thread *thread) {
-  if (_current_thread != nullptr) {
-    return _current_thread;
+  Thread *current = _current_thread;
+  if (current != nullptr) {
+    // Never replace the main thread or a Panda-started thread.
+    if (!current->is_auto_bound()) {
+      return current;
+    }
+    // Supersede the existing external binding; unsafe mid critical section.
+    // Set _current_thread first, so releasing the old holder ref does not
+    // clear it (see ~ThreadPosixImpl).
+#ifdef THREADED_PIPELINE
+    nassertr(current->epoch_participant().depth == 0, current);
+#endif
+    _current_thread = thread;
+    _bound_thread.thread = thread;
+    return thread;
   }
+
   if (thread == Thread::get_main_thread()) {
     _main_thread_known.test_and_set(std::memory_order_relaxed);
   }
   _current_thread = thread;
+  _bound_thread.thread = thread;
 #ifdef ANDROID
   bind_java_thread();
 #endif
@@ -375,17 +406,27 @@ root_func(void *data) {
 }
 
 /**
- * Called by get_current_thread() if the current thread pointer is null; checks
- * whether it might be the main thread.
+ * Resolves this OS thread's Thread object on first use.  The first caller in
+ * the process is the main thread; any other foreign thread is auto-bound to its
+ * own ExternalThread, so distinct OS threads never share an epoch participant.
  */
 Thread *ThreadPosixImpl::
 init_current_thread() {
-  Thread *thread = _current_thread;
-  if (!_main_thread_known.test_and_set(std::memory_order_relaxed)) {
-    thread = Thread::get_main_thread();
-    _current_thread = thread;
+  if (_current_thread != nullptr) {
+    return _current_thread;
   }
-  return thread;
+  if (!_main_thread_known.test_and_set(std::memory_order_relaxed)) {
+    _current_thread = Thread::get_main_thread();
+    return _current_thread;
+  }
+  // Teardown re-entrancy: don't mint into a holder that is destructing.
+  if (_thread_tearing_down) {
+    return Thread::get_main_thread();
+  }
+  PT(Thread) ext = Thread::make_current_external();
+  _current_thread = ext.p();
+  _bound_thread.thread = std::move(ext);
+  return _current_thread;
 }
 
 #ifdef ANDROID
