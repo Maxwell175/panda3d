@@ -73,7 +73,11 @@ PUBLISHED:
   INLINE static CPT(RenderState) make_empty();
   PY_EXTENSION(static explicit CPT(RenderState) make(PyObject *args, PyObject *kwargs));
 
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
 public:
+#endif
   static CPT(RenderState) make(const RenderAttrib *attrib, int override = 0);
   static CPT(RenderState) make(const RenderAttrib *attrib1,
                                const RenderAttrib *attrib2, int override = 0);
@@ -89,6 +93,8 @@ public:
                                const RenderAttrib *attrib3,
                                const RenderAttrib *attrib4,
                                const RenderAttrib *attrib5, int override = 0);
+
+public:
   static CPT(RenderState) make(const RenderAttrib * const *attrib,
                                int num_attribs, int override = 0);
 

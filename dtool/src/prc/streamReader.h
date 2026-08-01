@@ -72,7 +72,11 @@ PUBLISHED:
 
   PY_EXTENSION(PyObject *readline());
   PY_EXTENSION(PyObject *readlines());
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
 public:
+#endif
   BLOCKING vector_uchar extract_bytes(size_t size);
   BLOCKING std::string readline();
 

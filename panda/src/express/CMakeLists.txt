@@ -148,12 +148,15 @@ set(P3EXPRESS_IGATEEXT
 if(HAVE_CSHARP)
   set(P3EXPRESS_SOURCES ${P3EXPRESS_SOURCES}
     virtualFile_ext_csharp.cxx
-    virtualFileSystem_ext_csharp.cxx)
+    virtualFileSystem_ext_csharp.cxx
+    ramfile_ext_csharp.cxx)
   set(P3EXPRESS_IGATEEXT ${P3EXPRESS_IGATEEXT}
     virtualFile_ext_csharp.h
     virtualFile_ext_csharp.cxx
     virtualFileSystem_ext_csharp.h
-    virtualFileSystem_ext_csharp.cxx)
+    virtualFileSystem_ext_csharp.cxx
+    ramfile_ext_csharp.h
+    ramfile_ext_csharp.cxx)
 endif()
 
 composite_sources(p3express P3EXPRESS_SOURCES)

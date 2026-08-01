@@ -27,6 +27,11 @@
 class EXPCL_PANDA_EXPRESS StringStream : public std::iostream {
 public:
   INLINE StringStream(const std::string &source);
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
+public:
+#endif
   INLINE StringStream(vector_uchar source);
 
 PUBLISHED:
@@ -45,14 +50,19 @@ PUBLISHED:
 
   PY_MAKE_PROPERTY(data, get_data, set_data);
 
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
+public:
+#endif
+  void set_data(const unsigned char *data, size_t size);
+  INLINE void swap_data(vector_uchar &data);
+
 public:
 #ifndef CPPPARSER
   INLINE std::string get_data();
   INLINE void set_data(const std::string &data);
-  void set_data(const unsigned char *data, size_t size);
 #endif // !CPPPARSER
-
-  INLINE void swap_data(vector_uchar &data);
 
 private:
   StringStreamBuf _buf;

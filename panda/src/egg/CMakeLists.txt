@@ -99,6 +99,14 @@ set(P3EGG_IGATEEXT
   eggNode_ext.h
 )
 
+if(HAVE_CSHARP)
+  set(P3EGG_IGATEEXT ${P3EGG_IGATEEXT}
+    eggNode_ext_csharp.h
+    eggNode_ext_csharp.cxx)
+  set(P3EGG_SOURCES ${P3EGG_SOURCES}
+    eggNode_ext_csharp.cxx)
+endif()
+
 # These cannot be interrogated, and are excluded from the composites.
 add_bison_target(parser.cxx parser.yxx DEFINES parser.h PREFIX eggyy)
 add_flex_target(lexer.cxx lexer.lxx CASE_INSENSITIVE PREFIX eggyy)

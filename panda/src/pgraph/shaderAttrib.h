@@ -94,6 +94,11 @@ public:
   INLINE CPT(RenderAttrib) set_shader_input(CPT_InternalName id, double n1=0, double n2=0, double n3=0, double n4=1,
                                             int priority=0) const;
 
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
+public:
+#endif
   CPT(RenderAttrib) set_shader_inputs(const pvector<ShaderInput> &inputs) const;
 
 PUBLISHED:

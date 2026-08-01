@@ -39,9 +39,16 @@ class EXPCL_PANDA_GOBJ InternalName final : public TypedWritableReferenceCount {
 private:
   InternalName(InternalName *parent, const std::string &basename);
 
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
 public:
+#endif
+  // The plain-string factory, exposed to C# only; Python uses the interning
+  // make(PyObject*) extension.
   INLINE static PT(InternalName) make(const std::string &name);
 
+public:
   template<int N>
   INLINE static PT(InternalName) make(const char (&literal)[N]);
 

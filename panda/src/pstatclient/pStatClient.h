@@ -89,8 +89,15 @@ PUBLISHED:
   MAKE_PROPERTY(current_thread, get_current_thread);
   MAKE_PROPERTY(real_time, get_real_time);
 
+#ifdef HAVE_CSHARP
+  // C# binds the plain C++ connect directly; the EXTEND version is Python-only
+  // (it also installs the Python profiler).
+  INLINE static bool connect(const std::string &hostname = std::string(), int port = -1);
+  INLINE static void disconnect();
+#else
   EXTEND INLINE static bool connect(const std::string &hostname = std::string(), int port = -1);
   EXTEND INLINE static void disconnect();
+#endif
   INLINE static bool is_connected();
 
   INLINE static void resume_after_pause();

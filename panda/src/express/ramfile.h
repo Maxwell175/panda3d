@@ -18,6 +18,10 @@
 #include "referenceCount.h"
 #include "extension.h"
 
+#ifdef HAVE_CSHARP
+#include "vector_uchar.h"  // for the C# byte-accessor extensions
+#endif
+
 /**
  * An in-memory buffer specifically designed for downloading files to memory.
  */
@@ -32,6 +36,10 @@ PUBLISHED:
   PY_EXTENSION(PyObject *readlines());
 
   PY_EXTENSION(PyObject *get_data() const);
+  // Byte-safe reads for C# (std::string marshals lossily as UTF-8): return the
+  // bytes as a vector_uchar, which exposes a zero-copy span on the C# side.
+  CSHARP_EXTENSION(vector_uchar read_bytes(size_t length));
+  CSHARP_EXTENSION(vector_uchar get_data_bytes() const);
   INLINE size_t get_data_size() const;
   INLINE void clear();
 

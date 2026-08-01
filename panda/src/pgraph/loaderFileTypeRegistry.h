@@ -32,6 +32,11 @@ protected:
 public:
   ~LoaderFileTypeRegistry();
 
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
+public:
+#endif
   void register_type(LoaderFileType *type);
   void register_deferred_type(const std::string &extension, const std::string &library);
 

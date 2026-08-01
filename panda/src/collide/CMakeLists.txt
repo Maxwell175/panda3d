@@ -82,6 +82,14 @@ set(P3COLLIDE_IGATEEXT
   collisionTraverser_ext.h
 )
 
+if(HAVE_CSHARP)
+  set(P3COLLIDE_IGATEEXT ${P3COLLIDE_IGATEEXT}
+    collisionPolygon_ext_csharp.h
+    collisionPolygon_ext_csharp.cxx)
+  set(P3COLLIDE_SOURCES ${P3COLLIDE_SOURCES}
+    collisionPolygon_ext_csharp.cxx)
+endif()
+
 composite_sources(p3collide P3COLLIDE_SOURCES)
 add_component_library(p3collide SYMBOL BUILDING_PANDA_COLLIDE
   ${P3COLLIDE_HEADERS} ${P3COLLIDE_SOURCES})

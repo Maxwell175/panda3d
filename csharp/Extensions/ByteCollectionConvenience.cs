@@ -114,6 +114,19 @@ public partial class CPTA_uchar {
     return value.ToArray();
   }
 
+  /// <summary>Copies <paramref name="source"/> into a new const reference-counted array.</summary>
+  public static CPTA_uchar From(ReadOnlySpan<byte> source) => new(PTA_uchar.From(source));
+
+  /// <summary>Copies the bytes into a new const reference-counted array. Enables passing a
+  /// <c>byte[]</c> straight to any API taking a CPTA_uchar (e.g. Texture.SetRamImage).</summary>
+  public static implicit operator CPTA_uchar(byte[] source) {
+    ArgumentNullException.ThrowIfNull(source);
+    return new CPTA_uchar(PTA_uchar.From(source));
+  }
+
+  /// <summary>Copies the bytes into a new const reference-counted array.</summary>
+  public static implicit operator CPTA_uchar(ReadOnlySpan<byte> source) => new(PTA_uchar.From(source));
+
   /// <summary>Writes the contents to a stream.</summary>
   public void WriteTo(Stream destination) {
     ArgumentNullException.ThrowIfNull(destination);

@@ -78,6 +78,11 @@ PUBLISHED:
 
 public:
   BLOCKING INLINE void append_data(const void *data, size_t size);
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
+public:
+#endif
   BLOCKING INLINE void append_data(const std::string &data);
 
 private:

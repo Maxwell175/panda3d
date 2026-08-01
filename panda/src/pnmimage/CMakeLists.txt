@@ -34,6 +34,14 @@ set(P3PNMIMAGE_IGATEEXT
   pfmFile_ext.h
 )
 
+if(HAVE_CSHARP)
+  set(P3PNMIMAGE_IGATEEXT ${P3PNMIMAGE_IGATEEXT}
+    pnmImage_ext_csharp.h
+    pnmImage_ext_csharp.cxx)
+  set(P3PNMIMAGE_SOURCES ${P3PNMIMAGE_SOURCES}
+    pnmImage_ext_csharp.cxx)
+endif()
+
 if(HAVE_SSE2 AND CMAKE_SIZEOF_VOID_P EQUAL 4)
   # It's only necessary to do this on 32-bit x86; 64-bit makes SSE2 builtin.
   if(MSVC)

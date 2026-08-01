@@ -61,6 +61,7 @@ PUBLISHED:
 
   PY_EXTENSION(static bool verify_points(PyObject *points));
   PY_EXTENSION(void setup_points(PyObject *points));
+  CSHARP_EXTENSION(void setup_points(const pvector<LPoint3> &points));
 
 PUBLISHED:
   MAKE_SEQ_PROPERTY(points, get_num_points, get_point);

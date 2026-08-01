@@ -319,6 +319,13 @@ PUBLISHED:
   INLINE Row operator [] (int y);
   INLINE CRow operator [] (int y) const;
 
+PUBLISHED:
+  // Raw base address (as an integer) of the contiguous pixel / alpha arrays, so
+  // C# can take a zero-copy span over all pixels at once instead of per-pixel
+  // get_xel_val round-trips.  Only valid until the image is resized.
+  CSHARP_EXTENSION(uint64_t get_array_pointer());
+  CSHARP_EXTENSION(uint64_t get_alpha_array_pointer());
+
 public:
   // Know what you are doing if you access the underlying data arrays
   // directly.

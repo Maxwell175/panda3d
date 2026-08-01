@@ -101,9 +101,15 @@ PUBLISHED:
   virtual bool move_pointer(int device, int x, int y);
   virtual void close_ime();
 
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
 public:
+#endif
+  // Exposed to C# only; Python routes through the request_properties(kwds) extension.
   void request_properties(const WindowProperties &requested_properties);
 
+public:
   virtual void add_window_proc( const GraphicsWindowProc* wnd_proc_object ){};
   virtual void remove_window_proc( const GraphicsWindowProc* wnd_proc_object ){};
   virtual void clear_window_procs(){};

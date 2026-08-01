@@ -174,7 +174,13 @@ PUBLISHED:
 
   PY_EXTENSION(int __getbuffer__(PyObject *self, Py_buffer *view, int flags) const);
 
+#ifdef HAVE_CSHARP
+PUBLISHED:
+  // Bulk access to the whole table (vector_float exposes a zero-copy span in
+  // C#), avoiding per-point get_point round-trips.
+#else
 public:
+#endif
   INLINE const vector_float &get_table() const;
   INLINE void swap_table(vector_float &table);
 

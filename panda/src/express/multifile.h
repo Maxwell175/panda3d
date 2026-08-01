@@ -143,9 +143,14 @@ PUBLISHED:
   void set_header_prefix(const std::string &header_prefix);
   INLINE const std::string &get_header_prefix() const;
 
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
 public:
+#endif
   INLINE void set_encryption_password(const std::string &encryption_password);
   INLINE const std::string &get_encryption_password() const;
+public:
 
 #ifdef HAVE_OPENSSL
   class CertRecord {

@@ -55,6 +55,12 @@ public:
   INLINE ShaderInput(CPT_InternalName name, Texture *tex, int priority=0);
   INLINE ShaderInput(CPT_InternalName name, ParamValueBase *param, int priority=0);
   INLINE ShaderInput(CPT_InternalName name, ShaderBuffer *buf, int priority=0);
+
+#ifdef HAVE_CSHARP
+PUBLISHED:
+#else
+public:
+#endif
   INLINE ShaderInput(CPT_InternalName name, const PTA_float &ptr, int priority=0);
   INLINE ShaderInput(CPT_InternalName name, const PTA_LVecBase4f &ptr, int priority=0);
   INLINE ShaderInput(CPT_InternalName name, const PTA_LVecBase3f &ptr, int priority=0);
