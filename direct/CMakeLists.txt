@@ -37,7 +37,7 @@ install(TARGETS p3direct
 if(INTERROGATE_CSHARP_INTERFACE)
   add_csharp_module(panda3d.direct
     p3dcparser p3deadrec p3distributed p3interval
-    p3motiontrail p3showbase LINK p3direct)
+    p3motiontrail p3showbase LINK p3direct IMPORT panda3d.core)
 endif()
 
 if(HAVE_PYTHON)

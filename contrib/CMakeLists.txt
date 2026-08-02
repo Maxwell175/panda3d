@@ -8,8 +8,8 @@ add_subdirectory(src/contribbase)
 add_subdirectory(src/rplight)
 
 if(INTERROGATE_CSHARP_INTERFACE)
-  add_csharp_module(panda3d.ai p3ai)
-  add_csharp_module(panda3d._rplight p3rplight)
+  add_csharp_module(panda3d.ai p3ai IMPORT panda3d.core)
+  add_csharp_module(panda3d._rplight p3rplight IMPORT panda3d.core)
 endif()
 
 if(HAVE_PYTHON)

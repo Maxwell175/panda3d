@@ -110,26 +110,26 @@ if(INTERROGATE_CSHARP_INTERFACE)
   add_csharp_module(panda3d.core ${CORE_MODULE_COMPONENTS} LINK panda)
 
   if(HAVE_BULLET)
-    add_csharp_module(panda3d.bullet p3bullet)
+    add_csharp_module(panda3d.bullet p3bullet IMPORT panda3d.core)
   endif()
 
   if(HAVE_EGG)
-    add_csharp_module(panda3d.egg p3egg p3egg2pg LINK pandaegg)
+    add_csharp_module(panda3d.egg p3egg p3egg2pg LINK pandaegg IMPORT panda3d.core)
   endif()
 
-  add_csharp_module(panda3d.fx pandafx)
-  add_csharp_module(panda3d.physics p3physics p3particlesystem LINK pandaphysics)
+  add_csharp_module(panda3d.fx pandafx IMPORT panda3d.core)
+  add_csharp_module(panda3d.physics p3physics p3particlesystem LINK pandaphysics IMPORT panda3d.core)
 
   if(HAVE_ODE)
-    add_csharp_module(panda3d.ode p3ode)
+    add_csharp_module(panda3d.ode p3ode IMPORT panda3d.core)
   endif()
 
   if(HAVE_OPENCV OR HAVE_ARTOOLKIT)
-    add_csharp_module(panda3d.vision p3vision)
+    add_csharp_module(panda3d.vision p3vision IMPORT panda3d.core)
   endif()
 
   if(HAVE_VRPN)
-    add_csharp_module(panda3d.vrpn p3vrpn)
+    add_csharp_module(panda3d.vrpn p3vrpn IMPORT panda3d.core)
   endif()
 endif()
 

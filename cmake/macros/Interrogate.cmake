@@ -294,6 +294,14 @@ define_property(GLOBAL PROPERTY INTERROGATE_LIB_MODULE_MAP
   FULL_DOCS  "Populated by add_csharp_module, consumed by _interrogate_csharp_pass2")
 set_property(GLOBAL PROPERTY INTERROGATE_LIB_MODULE_MAP "")
 
+# Global property accumulating module>module dependency edges (from IMPORT).
+# Lets interrogate_csharp rank modules by dependency depth so a shared collection
+# (e.g. vector_string) is owned by the lowest-level module that defines it.
+define_property(GLOBAL PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS
+  BRIEF_DOCS "module=dependency pairs for collection ownership ranking"
+  FULL_DOCS  "Populated by add_csharp_module IMPORT, consumed by _interrogate_csharp_pass2")
+set_property(GLOBAL PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS "")
+
 # Internal: invoke interrogate_csharp (pass 2) to emit .cs files for one module.
 function(_interrogate_csharp_pass2 module stamp dllname module_databases)
   get_filename_component(stamp_directory "${stamp}" DIRECTORY)
@@ -311,6 +319,11 @@ function(_interrogate_csharp_pass2 module stamp dllname module_databases)
   set(_module_map_flags "")
   foreach(_entry ${_lib_module_map})
     list(APPEND _module_map_flags "--module-map" "${_entry}")
+  endforeach()
+
+  get_property(_module_depends GLOBAL PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS)
+  foreach(_entry ${_module_depends})
+    list(APPEND _module_map_flags "--module-depends" "${_entry}")
   endforeach()
 
   # Pass each .in file's basename as a separate --library flag so that
@@ -342,7 +355,8 @@ function(_interrogate_csharp_pass2 module stamp dllname module_databases)
     COMMENT "Generating final C# bindings for ${module}")
 endfunction()
 
-# add_csharp_module(panda3d.core target1 target2 ... [LINK metalib] [DLLNAME name])
+# add_csharp_module(panda3d.core target1 target2 ... [LINK metalib]
+#     [DLLNAME name] [IMPORT module ...])
 #
 # Assembles C# bindings for a module.  Each target must have been processed by
 # target_interrogate first.  This function:
@@ -350,6 +364,8 @@ endfunction()
 #   2. Adds the supplemental native sources to the metalib
 #   3. Runs interrogate_csharp (pass 2) to emit .cs files
 #   4. Registers library>module mappings for cross-module resolution
+#   5. Records IMPORT dependencies so a collection shared by several modules is
+#      owned by the lowest-level one (mirrors add_python_module's IMPORT).
 #
 function(add_csharp_module module)
   if(NOT INTERROGATE_CSHARP_INTERFACE)
@@ -358,6 +374,7 @@ function(add_csharp_module module)
 
   set(targets)
   set(link_targets)
+  set(import_modules)
   set(dllname "")
   set(keyword)
 
@@ -366,11 +383,16 @@ function(add_csharp_module module)
       set(keyword "LINK")
     elseif(arg STREQUAL "DLLNAME")
       set(keyword "DLLNAME")
+    elseif(arg STREQUAL "IMPORT")
+      set(keyword "IMPORT")
     elseif(keyword STREQUAL "LINK")
       list(APPEND link_targets "${arg}")
       set(keyword)
     elseif(keyword STREQUAL "DLLNAME")
       set(dllname "${arg}")
+      set(keyword)
+    elseif(keyword STREQUAL "IMPORT")
+      list(APPEND import_modules "${arg}")
       set(keyword)
     else()
       list(APPEND targets "${arg}")
@@ -379,6 +401,17 @@ function(add_csharp_module module)
 
   if(NOT link_targets)
     set(link_targets ${targets})
+  endif()
+
+  # Record this module's declared dependencies (IMPORT) so interrogate_csharp can
+  # rank modules by dependency depth.  Always register the module itself (with an
+  # empty dependency list when it imports nothing) so it is ranked as a root.
+  if(import_modules)
+    foreach(_import ${import_modules})
+      set_property(GLOBAL APPEND PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS "${module}=${_import}")
+    endforeach()
+  else()
+    set_property(GLOBAL APPEND PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS "${module}=")
   endif()
 
   # Derive the library name for [LibraryImport] from the first metalib target.
@@ -540,8 +573,13 @@ function(interrogate_csharp_native_sources target output database language_flags
 
   get_filename_component(output_directory "${output}" DIRECTORY)
   get_filename_component(database_directory "${database}" DIRECTORY)
+  # interrogate writes a .csharpcoll sidecar next to the .in (the collections
+  # this library defines); pass 2 reads them all to pick each collection's owner.
+  string(REGEX REPLACE "\\.in$" ".csharpcoll" _sidecar "${database}")
+
   add_custom_command(
     OUTPUT "${output}" "${database}"
+    BYPRODUCTS "${_sidecar}"
     JOB_POOL interrogate_csharp_finalize
     COMMAND ${CMAKE_COMMAND} -E make_directory "${output_directory}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${database_directory}"
