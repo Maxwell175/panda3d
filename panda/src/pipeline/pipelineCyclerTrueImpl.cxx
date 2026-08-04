@@ -104,6 +104,9 @@ void PipelineCyclerTrueImpl::
 operator = (const PipelineCyclerTrueImpl &copy) {
   ReMutexHolder holder1(_lock);
   ReMutexHolder holder2(copy._lock);
+  // Every stage is about to be replaced, so nothing is owed upstream.
+  _upstream_mask = 0;
+  _upstream_stage = -1;
   nassertv(get_parent_type() == copy.get_parent_type());
 
   // Build the new published pointers, then retire the old ones to EBR -- the
@@ -174,6 +177,12 @@ write_stage(int pipeline_stage, Thread *current_thread) {
 
   CycleDataNode &slot = _data[pipeline_stage];
 
+  // A stage written directly has a value of its own, which cycle() must not
+  // overwrite with a propagated one.
+  if (_upstream_mask != 0) {
+    _upstream_mask &= (unsigned char)~(1u << pipeline_stage);
+  }
+
   if (slot._writes_outstanding == 0) {
     // In-place fast path: mutate the published CData directly when no reader
     // can observe it -- this stage's CData is unshared (stage_unshared) and the
@@ -205,9 +214,8 @@ write_stage(int pipeline_stage, Thread *current_thread) {
         << "Copy-on-write a: " << current << " becomes "
         << slot._pending << "\n";
     }
-    if (!is_dirty() && _data != &_single_data) {
-      _pipeline->add_dirty_cycler(this);
-    }
+    // Dirtiness is settled in publish_write_stage(), once it is known whether
+    // the committed pointer left the stages differing.
   }
 
   ++slot._writes_outstanding;
@@ -246,12 +254,117 @@ stage_unshared(int pipeline_stage) const {
  */
 CycleData *PipelineCyclerTrueImpl::
 write_stage_upstream(int pipeline_stage, bool force_to_0, Thread *current_thread) {
-  // Pointer-assigning the write into each upstream stage would expose those
-  // stages' readers to a half-mutated CycleData, so just write_stage();
-  // Pipeline::cycle() propagates downstream next frame (force_to_0 becomes a
-  // one-cycle delay).
-  (void)force_to_0;
-  return write_stage(pipeline_stage, current_thread);
+  CycleData *r = write_stage(pipeline_stage, current_thread);
+
+  // After write_stage(), so one upstream writer among nested plain ones is
+  // enough to propagate.  Only meaningful on the COW path: an in-place write
+  // needs an unshared stage, which has nothing upstream to propagate to.
+  CycleDataNode &slot = _data[pipeline_stage];
+  if (slot._pending != nullptr && pipeline_upstream_propagate) {
+    slot._write_upstream = true;
+    slot._write_force_to_0 = slot._write_force_to_0 || force_to_0;
+  }
+  return r;
+}
+
+/**
+ * Outermost commit of a copy-on-write opened by write_stage().  Publishes
+ * _pending and, for a write_stage_upstream() writer, records which upstream
+ * stages may adopt it at the next cycle().
+ *
+ * Called with _lock held and _writes_outstanding already down to 0.
+ */
+void PipelineCyclerTrueImpl::
+publish_write_stage(int pipeline_stage) {
+  CycleDataNode &slot = _data[pipeline_stage];
+  CycleData *new_data = slot._pending;
+
+  // new_data was node_ref'd when write_stage created it; that is the reference
+  // this slot now owns.
+  CycleData *old_data =
+    slot._cdata.exchange(new_data, std::memory_order_release);
+  slot._pending = nullptr;
+  slot._write_thread.store(nullptr, std::memory_order_release);
+
+  bool upstream = slot._write_upstream;
+  bool force_to_0 = slot._write_force_to_0;
+  slot._write_upstream = false;
+  slot._write_force_to_0 = false;
+
+  if (upstream && _data != &_single_data) {
+    unsigned char mask = 0;
+    for (int k = pipeline_stage - 1; k >= 0; --k) {
+      // A stage with a write in flight belongs to its own writer.
+      if (_data[k]._writes_outstanding != 0) {
+        break;
+      }
+      if (_data[k]._cdata.load(std::memory_order_relaxed) != old_data &&
+          !force_to_0) {
+        // Diverged from what we replaced, so not ours to speak for.
+        // force_to_0 overrides: the caller wants stage 0 regardless.
+        break;
+      }
+      mask |= (unsigned char)(1u << k);
+    }
+    if (mask != 0) {
+      _upstream_mask |= mask;
+      _upstream_stage = (signed char)pipeline_stage;
+    }
+  }
+
+  // From the state actually reached, not assumed at write_stage() time:
+  // propagation routinely leaves every stage equal.  Safe to defer because
+  // cycle() needs _lock, held here since write_stage().
+  if (_data != &_single_data && !is_dirty()) {
+    int num_stages = _data[0]._num_stages;
+    for (int i = 1; i < num_stages; ++i) {
+      if (_data[i]._cdata.load(std::memory_order_relaxed) !=
+          _data[i - 1]._cdata.load(std::memory_order_relaxed)) {
+        _pipeline->add_dirty_cycler(this);
+        break;
+      }
+    }
+  }
+
+  EpochManager::retire(old_data);
+}
+
+/**
+ * Hands the value written at _upstream_stage to the upstream stages recorded
+ * in _upstream_mask.  Without this the next rotation copies stage i-1 over
+ * stage i and the downstream write is lost, so caches computed during cull are
+ * rebuilt every frame.
+ *
+ * Runs at the start of cycle*() rather than at commit, so the writing stage
+ * stays unshared for the frame and repeat writes keep the in-place path.
+ * Called with _lock held, so no writer can be mid-commit.
+ */
+void PipelineCyclerTrueImpl::
+propagate_upstream_locked() {
+  unsigned char mask = _upstream_mask;
+  _upstream_mask = 0;
+  int src = _upstream_stage;
+  _upstream_stage = -1;
+  if (mask == 0 || src < 0 || _data == &_single_data) {
+    return;
+  }
+
+  CycleData *value = _data[src]._cdata.load(std::memory_order_relaxed);
+  for (int k = 0; k < src; ++k) {
+    if ((mask & (1u << k)) == 0) {
+      continue;
+    }
+    CycleData *displaced = _data[k]._cdata.load(std::memory_order_relaxed);
+    if (displaced == value) {
+      continue;
+    }
+    if (value != nullptr) {
+      value->node_ref();
+    }
+    displaced = _data[k]._cdata.exchange(value, std::memory_order_release);
+    // Readers at stage k may still hold the displaced snapshot.
+    EpochManager::retire(displaced);
+  }
 }
 
 /**
@@ -275,6 +388,25 @@ cycle() {
   nassertv(is_dirty());
   Thread::assert_in_epoch(Thread::get_current_thread());
 
+  // First, or the rotation overwrites the downstream value with the stale
+  // upstream one -- which is the write being propagated.
+  propagate_upstream_locked();
+
+  bool all_equal = true;
+  for (int i = 1; i < num_stages; ++i) {
+    if (_data[i]._cdata.load(std::memory_order_relaxed) !=
+        _data[i - 1]._cdata.load(std::memory_order_relaxed)) {
+      all_equal = false;
+      break;
+    }
+  }
+  if (all_equal) {
+    // Common once propagation has run; rotating would node_ref and retire the
+    // same pointer for nothing.
+    clear_dirty();
+    return;
+  }
+
   // Rotate stage i-1 -> i (high to low).  Each step node_refs the destination
   // slot, exchanges, and yields the displaced pointer.  Every displaced
   // pointer but the last is double-counted (stage i+1 already node_ref'd the
@@ -284,6 +416,11 @@ cycle() {
   for (int i = num_stages - 1; i > 0; --i) {
     nassertv(_data[i]._writes_outstanding == 0);
     CycleData *incoming = _data[i - 1]._cdata.load(std::memory_order_relaxed);
+    if (incoming == _data[i]._cdata.load(std::memory_order_relaxed)) {
+      // Usual after propagation; exchanging a pointer for itself would only
+      // node_ref and release it again.
+      continue;
+    }
     if (incoming != nullptr) {
       incoming->node_ref();
     }
@@ -316,6 +453,10 @@ cycle() {
 void PipelineCyclerTrueImpl::
 set_num_stages(int num_stages) {
   nassertv(_lock.debug_is_locked());
+
+  // Stage indices are about to move; any recorded entitlement is meaningless.
+  _upstream_mask = 0;
+  _upstream_stage = -1;
 
   if (_data == &_single_data) {
     // We've got only 1 stage.  Allocate an array.
