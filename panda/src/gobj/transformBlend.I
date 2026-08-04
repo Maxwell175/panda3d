@@ -179,10 +179,41 @@ set_weight(size_t n, PN_stdfloat weight) {
 INLINE void TransformBlend::
 update_blend(Thread *current_thread) const {
   CDLockedReader cdata(_cycler, current_thread);
-  if (cdata->_global_modified != VertexTransform::get_global_modified(current_thread)) {
-    CDWriter cdataw(((TransformBlend *)this)->_cycler, cdata, false);
-    ((TransformBlend *)this)->recompute_result(cdataw, current_thread);
+  if (cdata->_global_modified == VertexTransform::get_global_modified(current_thread)) {
+    // Nothing anywhere has moved since we last recomputed.
+    return;
   }
+
+  // That counter is process-global, so it says almost nothing about *this*
+  // blend: a handful of changed joints bumps it every frame while most blends
+  // are unaffected.  Ask whether our own transforms moved before opening a
+  // writer, which under a threaded pipeline is a copy-on-write plus a retire.
+  // Leaving _global_modified stale costs only this re-check next frame.
+  UpdateSeq seq = get_entries_modified(current_thread);
+  if (cdata->_modified == seq) {
+    return;
+  }
+
+  CDWriter cdataw(((TransformBlend *)this)->_cycler, cdata, false);
+  ((TransformBlend *)this)->recompute_result(cdataw, seq, current_thread);
+}
+
+/**
+ * Returns the highest modified counter among this blend's own transforms: the
+ * value _modified is keyed on, and so the authoritative staleness test.  Each
+ * get_modified() is a lock-free cycler read.
+ */
+INLINE UpdateSeq TransformBlend::
+get_entries_modified(Thread *current_thread) const {
+  UpdateSeq seq;
+  Entries::const_iterator ei;
+  for (ei = _entries.begin(); ei != _entries.end(); ++ei) {
+    UpdateSeq m = (*ei)._transform->get_modified(current_thread);
+    if (seq < m) {
+      seq = m;
+    }
+  }
+  return seq;
 }
 
 /**
@@ -338,12 +369,16 @@ INLINE UpdateSeq TransformBlend::
 get_modified(Thread *current_thread) const {
   CDLockedReader cdata(_cycler, current_thread);
   if (cdata->_global_modified != VertexTransform::get_global_modified(current_thread)) {
-    CDWriter cdataw(((TransformBlend *)this)->_cycler, cdata, false);
-    ((TransformBlend *)this)->recompute_result(cdataw, current_thread);
-    return cdataw->_modified;
-  } else {
-    return cdata->_modified;
+    // As in update_blend(): only copy-on-write if one of our own transforms
+    // moved, not merely because something somewhere did.
+    UpdateSeq seq = get_entries_modified(current_thread);
+    if (cdata->_modified != seq) {
+      CDWriter cdataw(((TransformBlend *)this)->_cycler, cdata, false);
+      ((TransformBlend *)this)->recompute_result(cdataw, seq, current_thread);
+      return cdataw->_modified;
+    }
   }
+  return cdata->_modified;
 }
 
 /**
