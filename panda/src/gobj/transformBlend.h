@@ -92,7 +92,8 @@ PUBLISHED:
 private:
   class CData;
 
-  void recompute_result(CData *cdata, Thread *current_thread);
+  INLINE UpdateSeq get_entries_modified(Thread *current_thread) const;
+  void recompute_result(CData *cdata, UpdateSeq seq, Thread *current_thread);
   void clear_result(Thread *current_thread);
 
   class TransformEntry {

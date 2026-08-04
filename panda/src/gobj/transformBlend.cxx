@@ -209,23 +209,19 @@ write(std::ostream &out, int indent_level) const {
  * necessary.
  */
 void TransformBlend::
-recompute_result(CData *cdata, Thread *current_thread) {
+recompute_result(CData *cdata, UpdateSeq seq, Thread *current_thread) {
   // Update the global_modified sequence number first, to prevent race
   // conditions.
   cdata->_global_modified = VertexTransform::get_global_modified(current_thread);
 
-  // Now see if we really need to recompute.
-  UpdateSeq seq;
-  Entries::const_iterator ei;
-  for (ei = _entries.begin(); ei != _entries.end(); ++ei) {
-    seq = std::max(seq, (*ei)._transform->get_modified(current_thread));
-  }
-
+  // `seq` comes from the caller, which needed it to decide whether to open this
+  // writer at all.
   if (cdata->_modified != seq) {
     // We do need to recompute.
     cdata->_modified = seq;
 
     cdata->_result = LMatrix4::zeros_mat();
+    Entries::const_iterator ei;
     for (ei = _entries.begin(); ei != _entries.end(); ++ei) {
       (*ei)._transform->accumulate_matrix(cdata->_result, (*ei)._weight);
     }
