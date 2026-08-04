@@ -23,12 +23,22 @@
 #include "geomVertexFormat.h"
 #include "geomVertexWriter.h"
 #include "trueClock.h"
+#include "animControlCollection.h"
+#include "auto_bind.h"
+#include "loader.h"
+#include "partBundleNode.h"
+#include "character.h"
+#include "epochHolder.h"
+#include "epochManager.h"
 
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <memory>
+#include <condition_variable>
+#include <mutex>
 #include <random>
 #include <string>
 #include <thread>
@@ -53,6 +63,16 @@ struct Options {
   bool complex = false;                 // build a deep, varied static scene
   int depth = 7;                        // complex: hierarchy depth
   int branch = 4;                       // complex: children per internal node
+  int crowd = 0;                        // animated characters (0 = off)
+  // Extensions spelled out: an extensionless path needs
+  // default-model-extension, which the inline prc does not set.
+  std::string crowd_model =             // skinned model with clips beside it
+      "samples/roaming-ralph/models/ralph.egg.pz";
+  std::string crowd_anim =
+      "samples/roaming-ralph/models/ralph-run.egg.pz";
+  float crowd_radius = 60.0f;           // scatter disc, in units
+  bool crowd_frame_blend = false;       // interpolate between baked frames
+  int anim_threads = 0;                 // fan character updates out over N threads
 };
 
 std::atomic<bool> g_stop{false};
@@ -118,6 +138,89 @@ void build_complex(NodePath parent, int depth, int branch, std::mt19937 &rng,
   }
 }
 
+// A crowd of independently-animating skinned characters.
+//
+// Where --complex measures a large static tree -- many nodes, almost nothing
+// dirty per frame -- a crowd is the opposite: every character's joints and
+// skinned vertex data change every frame, so the count of DIRTY cyclers scales
+// with the crowd, and with it the per-stage copy-on-write and the retire queue.
+//
+// Each character is a real copy (copy_to, not an instance); instancing would
+// share one Character and measure a cache rather than a crowd.  Returns false
+// if the model or clip could not be loaded, so the caller skips rather than
+// reporting an empty crowd as a fast one.
+bool build_crowd(NodePath parent, const Options &o, std::mt19937 &rng,
+                 std::vector<std::unique_ptr<AnimControlCollection>> &controls,
+                 std::vector<NodePath> &chars) {
+  Loader *loader = Loader::get_global_ptr();
+
+  PT(PandaNode) model = loader->load_sync(Filename(o.crowd_model));
+  if (model == nullptr) {
+    fprintf(stderr, "skip: cannot load crowd model '%s' "
+                    "(run from the panda3d source root, or pass --crowd-model)\n",
+            o.crowd_model.c_str());
+    return false;
+  }
+  NodePath model_np(model);
+
+  PT(PandaNode) anim = loader->load_sync(Filename(o.crowd_anim));
+  if (anim == nullptr) {
+    fprintf(stderr, "skip: cannot load crowd animation '%s'\n", o.crowd_anim.c_str());
+    return false;
+  }
+
+  std::uniform_real_distribution<float> ang(0.0f, 360.0f);
+  std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+
+  for (int i = 0; i < o.crowd; ++i) {
+    NodePath ch = parent.attach_new_node("crowd-member");
+
+    // A fresh copy of both the model and the clip: binding needs an AnimBundle
+    // that is not already bound to another character's PartBundle.
+    NodePath body = model_np.copy_to(ch);
+    NodePath clip = NodePath(anim).copy_to(body);
+
+    auto c = std::make_unique<AnimControlCollection>();
+    auto_bind(ch.node(), *c, ~0);
+    if (c->get_num_anims() == 0) {
+      fprintf(stderr, "skip: crowd model bound no animations "
+                      "(is '%s' a clip for '%s'?)\n",
+              o.crowd_anim.c_str(), o.crowd_model.c_str());
+      return false;
+    }
+
+    // Off by default.  With it on the pose is a fresh interpolation every
+    // rendered frame, so the skinning cache never hits -- a fixed per-frame
+    // workload, which is the right basis for comparing builds.
+    for (int p = 0; p < c->get_num_anims(); ++p) {
+      c->get_anim(p)->get_part()->set_frame_blend_flag(o.crowd_frame_blend);
+    }
+
+    // Staggered, so the crowd is not one character drawn N times: each member
+    // dirties its cyclers on its own schedule.
+    c->loop_all(true);
+    for (int p = 0; p < c->get_num_anims(); ++p) {
+      AnimControl *ac = c->get_anim(p);
+      ac->pose(unit(rng) * std::max(1, ac->get_num_frames()));
+      ac->set_play_rate(0.8 + 0.4 * unit(rng));
+    }
+    c->loop_all(true);
+
+    // Uniform over the disc in front of the camera, so most of the crowd
+    // survives the frustum test; animation hangs off Character::cull_callback,
+    // so an off-frustum character costs nothing.
+    double a = ang(rng) * (3.14159265358979 / 180.0);
+    double r = std::sqrt(unit(rng)) * o.crowd_radius;
+    ch.set_pos((float)(std::cos(a) * r), (float)(std::sin(a) * r) + o.crowd_radius * 1.6f,
+               0.0f);
+    ch.set_h(ang(rng));
+
+    controls.push_back(std::move(c));
+    chars.push_back(ch);
+  }
+  return true;
+}
+
 void animate_worker(std::vector<NodePath> objs, int seed) {
   std::mt19937 rng((unsigned)seed * 2654435761u + 1u);
   std::uniform_int_distribution<size_t> pick(0, objs.empty() ? 0 : objs.size() - 1);
@@ -180,6 +283,12 @@ int parse(int argc, char **argv, Options &o) {
     else if (!strcmp(argv[i], "--complex")) o.complex = true;
     else if (!strcmp(argv[i], "--depth")) next(o.depth);
     else if (!strcmp(argv[i], "--branch")) next(o.branch);
+    else if (!strcmp(argv[i], "--crowd")) next(o.crowd);
+    else if (!strcmp(argv[i], "--crowd-model") && i + 1 < argc) o.crowd_model = argv[++i];
+    else if (!strcmp(argv[i], "--crowd-anim") && i + 1 < argc) o.crowd_anim = argv[++i];
+    else if (!strcmp(argv[i], "--crowd-radius") && i + 1 < argc) o.crowd_radius = (float)atof(argv[++i]);
+    else if (!strcmp(argv[i], "--crowd-frame-blend")) o.crowd_frame_blend = true;
+    else if (!strcmp(argv[i], "--anim-threads")) next(o.anim_threads);
     else { fprintf(stderr, "unknown arg: %s\n", argv[i]); return 1; }
   }
   return 0;
@@ -199,6 +308,10 @@ int main(int argc, char **argv) {
   prc +=
       "aux-display p3tinydisplay\n"
       "win-size 16 16\n"
+      // This prc is inline and reads no etc/*.prc, so the working directory
+      // and the egg loader both have to be named explicitly.
+      "model-path .\n"
+      "load-file-type egg pandaegg\n"
       "notify-level-pgraph fatal\n"
       "notify-level-display fatal\n"
       "notify-level-loader fatal\n"
@@ -229,8 +342,34 @@ int main(int argc, char **argv) {
   // the pool the workers move.
   std::vector<std::vector<NodePath>> group_objs(std::max(1, o.groups));
   std::vector<NodePath> all_objs;
+  std::vector<std::unique_ptr<AnimControlCollection>> crowd_controls;
+  std::vector<NodePath> crowd_chars;
+  std::vector<PT(Character)> crowd_characters;
   int init_objects;
-  if (o.complex) {
+  if (o.crowd > 0) {
+    // A crowd stands alone: the point is that the per-frame cost is dirty
+    // cyclers, so mixing in the instanced-triangle pool would only add clean
+    // ones and dilute what is being measured.
+    NodePath croot = render.attach_new_node("crowd-root");
+    if (!build_crowd(croot, o, rng, crowd_controls, crowd_chars)) {
+      return 77;
+    }
+    all_objs = crowd_chars;
+    init_objects = (int)crowd_chars.size();
+    // For --anim-threads.  Character::update() is what cull_callback calls and
+    // no-ops once it has run for this frame's time, so updating here moves the
+    // work off cull rather than duplicating it.
+    for (NodePath &ch : crowd_chars) {
+      NodePath cnp = ch.find("**/+Character");
+      if (!cnp.is_empty()) {
+        crowd_characters.push_back(DCAST(Character, cnp.node()));
+      }
+    }
+    if (o.anim_threads > 0 && crowd_characters.empty()) {
+      fprintf(stderr, "skip: --anim-threads but no Character nodes found\n");
+      return 77;
+    }
+  } else if (o.complex) {
     // One deep, varied static tree (transforms + states at every node).  Leaves
     // populate all_objs.  Intended for steady-state render measurement with
     // --workers 0 --anim-per-frame 0 (no per-frame scene mutation).  Anchor it
@@ -260,11 +399,20 @@ int main(int argc, char **argv) {
     gen_roots.push_back(render.attach_new_node("gen-root"));
   }
 
-  fprintf(stderr,
-    "[bench] workload=%s workers=%d threading-model=\"%s\" objects=%d groups=%d "
-    "readers=%d duration=%.1fs\n",
-    o.workload.c_str(), o.workers, o.threading_model.c_str(),
-    init_objects, o.groups, o.readers, o.duration);
+  if (o.crowd > 0) {
+    fprintf(stderr,
+      "[bench] workload=crowd characters=%d clips=%d frame-blend=%s "
+      "threading-model=\"%s\" readers=%d duration=%.1fs\n",
+      init_objects, crowd_controls.empty() ? 0 : crowd_controls[0]->get_num_anims(),
+      o.crowd_frame_blend ? "on" : "off",
+      o.threading_model.c_str(), o.readers, o.duration);
+  } else {
+    fprintf(stderr,
+      "[bench] workload=%s workers=%d threading-model=\"%s\" objects=%d groups=%d "
+      "readers=%d duration=%.1fs\n",
+      o.workload.c_str(), o.workers, o.threading_model.c_str(),
+      init_objects, o.groups, o.readers, o.duration);
+  }
 
   // Spawn workload + reader threads.
   std::vector<std::thread> threads;
@@ -297,10 +445,58 @@ int main(int argc, char **argv) {
     framework.do_frame(current_thread);
   }
 
+  // Character-update fan-out: per-character animation is independent, so it
+  // should scale with cores.  A persistent pool with a barrier per frame, so
+  // what is measured is the fan-out and not thread creation.
+  std::vector<std::thread> anim_pool;
+  std::mutex anim_mx;
+  std::condition_variable anim_cv, anim_done_cv;
+  unsigned anim_epoch = 0, anim_finished = 0;
+  bool anim_quit = false;
+  if (o.anim_threads > 0) {
+    int nthreads = o.anim_threads;
+    for (int t = 0; t < nthreads; ++t) {
+      anim_pool.emplace_back([&, t, nthreads]() {
+        unsigned seen = 0;
+        for (;;) {
+          std::unique_lock<std::mutex> lk(anim_mx);
+          anim_cv.wait(lk, [&]{ return anim_quit || anim_epoch != seen; });
+          if (anim_quit) return;
+          seen = anim_epoch;
+          lk.unlock();
+          {
+            // Each batch is its own epoch frame: a parked thread holding a
+            // published slot would pin the reclaim floor process-wide.
+            EpochHolder epoch;
+            for (size_t i = t; i < crowd_characters.size(); i += nthreads) {
+              crowd_characters[i]->update();
+            }
+          }
+          lk.lock();
+          if (++anim_finished == (unsigned)nthreads) {
+            anim_done_cv.notify_one();
+          }
+        }
+      });
+    }
+  }
+  auto run_anim_pass = [&]() {
+    if (o.anim_threads <= 0) return;
+    {
+      std::lock_guard<std::mutex> lk(anim_mx);
+      anim_finished = 0;
+      ++anim_epoch;
+    }
+    anim_cv.notify_all();
+    std::unique_lock<std::mutex> lk(anim_mx);
+    anim_done_cv.wait(lk, [&]{ return anim_finished == (unsigned)o.anim_threads; });
+  };
+
   TrueClock *clock = TrueClock::get_global_ptr();
   double t_start = clock->get_long_time();
   while (clock->get_long_time() - t_start < o.duration) {
-    if (o.workers == 0) {
+    // A crowd is its own workload; a set_pos batch on top would measure both.
+    if (o.workers == 0 && o.crowd == 0) {
       if (o.workload == "animate") {
         for (int i = 0; i < o.anim_per_frame && !all_objs.empty(); ++i) {
           all_objs[pick(rng)].set_pos(pos(rng), pos(rng) + 200.0f, pos(rng));
@@ -318,6 +514,7 @@ int main(int argc, char **argv) {
       }
     }
     double f0 = clock->get_long_time();
+    run_anim_pass();
     framework.do_frame(current_thread);
     frame_ms.push_back((clock->get_long_time() - f0) * 1000.0);
   }
@@ -325,6 +522,11 @@ int main(int argc, char **argv) {
 
   g_stop.store(true);
   for (auto &t : threads) t.join();
+  if (!anim_pool.empty()) {
+    { std::lock_guard<std::mutex> lk(anim_mx); anim_quit = true; }
+    anim_cv.notify_all();
+    for (auto &t : anim_pool) t.join();
+  }
 
   // Report.
   std::sort(frame_ms.begin(), frame_ms.end());
@@ -338,7 +540,7 @@ int main(int argc, char **argv) {
   long long anim = g_anim_ops.load(), gen = g_gen_nodes.load(), reads = g_read_ops.load();
 
   printf("%-9s %5d %-9s %8zu %8.1f %8.3f %8.3f %12.0f %12.0f %12.0f\n",
-         o.workload.c_str(), o.workers,
+         o.crowd > 0 ? "crowd" : o.workload.c_str(), o.workers,
          o.threading_model.empty() ? "single" : o.threading_model.c_str(),
          frames, fps, pct(0.50), pct(0.99),
          anim / elapsed, gen / elapsed, reads / elapsed);
