@@ -39,11 +39,17 @@ class CycleData;
 #ifndef CPPPARSER
 // Per-OS-thread epoch state (lives on Thread; see Thread::epoch_participant).
 // slot == 0 means quiescent, else the epoch observed at the outermost enter.
+// Kept at 32 bytes: it is a member of Thread and is touched on every
+// CycleDataReader, so growing it slows the cull read path.  Check sizeof before
+// adding a member.
 struct EpochParticipant {
   uint32_t depth = 0;
+  uint32_t reclaim_ticks = 0;
   patomic<uint64_t> slot{0};
   EpochParticipant *next = nullptr;
-  uint32_t reclaim_ticks = 0;
+  // Pointers retired but not yet handed to the shared queue.  The buffer itself
+  // is a thread_local in epochManager.cxx; only the count is needed here.
+  uint32_t retire_pending = 0;
   bool registered = false;
   bool online = false;
   ~EpochParticipant();
@@ -63,6 +69,8 @@ public:
   static void go_online(EpochParticipant &p);
 
   static void retire(CycleData *cd);
+  static void flush_retired(EpochParticipant &p);
+  static void note_retired(size_t n);
   static void try_advance_epoch();
   static size_t try_reclaim(size_t budget = ~size_t(0));
   static void consider_reclaim(EpochParticipant &p);
@@ -99,6 +107,9 @@ private:
   // Retired-entry count at which an online thread drains on its way back to
   // depth 0.
   static constexpr size_t checkpoint_threshold = 256;
+
+  // Retired pointers buffered per thread before handing the batch over.
+  static constexpr uint32_t retire_batch = 256;
 
   // Live occupant count per stage; the in-place fast path gates on count <= 1.
   static patomic<int> _threads_at_stage[MAX_STAGES];

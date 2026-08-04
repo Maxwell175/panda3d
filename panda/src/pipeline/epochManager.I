@@ -41,6 +41,10 @@ ALWAYS_INLINE void EpochManager::
 leave(EpochParticipant &p) {
   if (--p.depth == 0) {
     p.slot.store(0, std::memory_order_release);
+    // Or a thread that retires a little and then parks would strand it.
+    if (p.retire_pending != 0) {
+      flush_retired(p);
+    }
     if (_retired_count.load(std::memory_order_relaxed) >= checkpoint_threshold) {
       try_advance_epoch();
       try_reclaim(256);
