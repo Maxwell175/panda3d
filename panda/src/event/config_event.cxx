@@ -23,7 +23,9 @@
 #include "eventHandler.h"
 #include "eventParameter.h"
 #include "genericAsyncTask.h"
+#ifdef HAVE_CSHARP
 #include "managedAsyncTask.h"
+#endif
 #include "pointerEventList.h"
 
 #include "dconfig.h"
@@ -51,7 +53,9 @@ ConfigureFn(config_event) {
   EventStoreInt::init_type("EventStoreInt");
   EventStoreDouble::init_type("EventStoreDouble");
   GenericAsyncTask::init_type();
+#ifdef HAVE_CSHARP
   ManagedAsyncTask::init_type();
+#endif
 
   ButtonEventList::register_with_read_factory();
   EventStoreInt::register_with_read_factory();
