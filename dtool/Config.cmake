@@ -442,13 +442,27 @@ mark_as_advanced(SIMULATE_NETWORK_DELAY DO_MEMORY_USAGE DO_DCAST)
 
 find_package(MIMALLOC QUIET)
 
+# Prefer the static library on Windows, which is what it ships.  Elsewhere fall
+# back to the shared one: several distributions install libmimalloc.a as an
+# override shim with the implementation only in the .so, so linking the archive
+# leaves mi_malloc/mi_free undefined in libp3dtool.
+if(TARGET mimalloc-static AND NOT TARGET mimalloc)
+  set(_mimalloc_target mimalloc-static)
+elseif(TARGET mimalloc-static AND WIN32)
+  set(_mimalloc_target mimalloc-static)
+elseif(TARGET mimalloc)
+  set(_mimalloc_target mimalloc)
+else()
+  set(_mimalloc_target mimalloc-static)
+endif()
+
 package_option(MIMALLOC
   "The mimalloc allocator.  See also USE_MEMORY_MIMALLOC, which
 you will need to use to activate it by default.  If you do not set
 USE_MEMORY_MIMALLOC, Panda will decide whether to use it."
-  IMPORTED_AS mimalloc-static)
+  IMPORTED_AS ${_mimalloc_target})
 
-if (WIN32 AND HAVE_MIMALLOC)
+if (HAVE_MIMALLOC)
   set(_prefer_mimalloc ON)
 else()
   set(_prefer_mimalloc OFF)
@@ -456,9 +470,14 @@ endif()
 
 option(USE_MEMORY_MIMALLOC
   "This is an optional memory allocator with good multi-threading
-support.  It is recommended on Windows, where it gives much better
-performance than the built-in malloc.  However, it does not appear
-to be significantly faster on glibc-based systems." ${_prefer_mimalloc})
+support.  It is recommended wherever it is available.
+
+Note that the alternative is usually not the system malloc: when 16-byte
+alignment is required, which LINMATH_ALIGN asks for and is on by default
+for SSE2, dtoolbase.h falls through to dlmalloc.  dlmalloc has a single
+global arena and serializes every allocation in the process, so it
+collapses once more than one thread allocates -- which is what a threaded
+render pipeline does." ${_prefer_mimalloc})
 
 option(USE_MEMORY_DLMALLOC
   "This is an optional alternative memory-allocation scheme
