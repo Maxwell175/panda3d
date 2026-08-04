@@ -403,15 +403,9 @@ release_write_stage(int pipeline_stage, CycleData *pointer) {
   CycleDataNode &slot = _data[pipeline_stage];
   if (--slot._writes_outstanding == 0) {
     if (slot._pending != nullptr) {
-      // Outermost COW commit: publish the copy (already node_ref'd when it was
-      // created in write_stage) and retire the old pointer to EBR.  Clear the
-      // read-your-writes steer so this thread now sees the published pointer.
-      CycleData *new_data = slot._pending;
-      CycleData *old_data =
-        slot._cdata.exchange(new_data, std::memory_order_release);
-      slot._pending = nullptr;
-      slot._write_thread.store(nullptr, std::memory_order_release);
-      EpochManager::retire(old_data);
+      // Out of line: it needs Pipeline, and the in-place commit below is the
+      // path worth keeping inline.
+      publish_write_stage(pipeline_stage);
     } else {
       // Outermost in-place commit: release the slot claimed in write_stage.
       EpochManager::end_inplace_write(pipeline_stage);
@@ -503,9 +497,19 @@ cycle_2() {
   nassertv(_data[1]._writes_outstanding == 0);
   Thread::assert_in_epoch(Thread::get_current_thread());
 
+  // First, or the rotation below overwrites stage 1 with the value being
+  // propagated out of it.
+  propagate_upstream_locked();
+
   // Rotate stage 0 -> 1: node_ref the incoming pointer (stage 1 now owns it),
   // exchange, and retire the outgoing pointer to EBR.
   CycleData *incoming = _data[0]._cdata.load(std::memory_order_relaxed);
+  if (incoming == _data[1]._cdata.load(std::memory_order_relaxed)) {
+    // Common once propagation has run; rotating would node_ref and retire the
+    // same pointer for nothing.
+    clear_dirty();
+    return;
+  }
   if (incoming != nullptr) {
     incoming->node_ref();
   }
@@ -536,19 +540,34 @@ cycle_3() {
   nassertv(_data[1]._writes_outstanding == 0);
   Thread::assert_in_epoch(Thread::get_current_thread());
 
+  // First, as in cycle_2().
+  propagate_upstream_locked();
+
+  CycleData *at_0 = _data[0]._cdata.load(std::memory_order_relaxed);
+  if (at_0 == _data[1]._cdata.load(std::memory_order_relaxed) &&
+      at_0 == _data[2]._cdata.load(std::memory_order_relaxed)) {
+    // Common once propagation has run.
+    clear_dirty();
+    return;
+  }
+
   // Rotate stage 1 -> stage 2, then stage 0 -> stage 1.
   CycleData *into_2 = _data[1]._cdata.load(std::memory_order_relaxed);
   if (into_2 != nullptr) into_2->node_ref();
   CycleData *outgoing = _data[2]._cdata.exchange(into_2, std::memory_order_release);
   EpochManager::retire(outgoing);
 
+  // Stage 1 still holds into_2; skip the second step when stage 0 agrees with
+  // it, the usual state after propagation.
   CycleData *into_1 = _data[0]._cdata.load(std::memory_order_relaxed);
-  if (into_1 != nullptr) into_1->node_ref();
-  CycleData *bumped_1 = _data[1]._cdata.exchange(into_1, std::memory_order_release);
-  // bumped_1 was stage 1's occupant; we node_ref'd it into stage 2 above, so
-  // drop the extra ref it held as stage 1's occupant.
-  if (bumped_1 != nullptr) {
-    node_unref_delete<CycleData>(bumped_1);
+  if (into_1 != into_2) {
+    if (into_1 != nullptr) into_1->node_ref();
+    CycleData *bumped_1 = _data[1]._cdata.exchange(into_1, std::memory_order_release);
+    // bumped_1 was stage 1's occupant; we node_ref'd it into stage 2 above, so
+    // drop the extra ref it held as stage 1's occupant.
+    if (bumped_1 != nullptr) {
+      node_unref_delete<CycleData>(bumped_1);
+    }
   }
 
   if (_data[2]._cdata.load(std::memory_order_relaxed) ==

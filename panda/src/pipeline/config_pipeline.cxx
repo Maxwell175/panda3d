@@ -66,6 +66,14 @@ ConfigVariableBool pipeline_always_cow
           "exercise and benchmark the COW path.  Default false (the fast path "
           "mutates in place when it is provably safe)."));
 
+ConfigVariableBool pipeline_upstream_propagate
+("pipeline-upstream-propagate", true,
+ PRC_DESC("Whether CycleDataWriter's write_upstream() variants actually reach "
+          "the upstream pipeline stages.  Set false to make them behave like a "
+          "plain write, in which case data computed downstream -- during cull, "
+          "say -- is discarded by the next Pipeline::cycle(), which copies "
+          "stage i-1 over stage i.  Provided mainly to A/B the behaviour."));
+
 /**
  * Initializes the library.  This must be called at least once before any of
  * the functions or classes in this library can be used.  Normally it will be

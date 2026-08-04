@@ -116,6 +116,11 @@ private:
   INLINE void cycle_3();
   void set_num_stages(int num_stages);
   bool stage_unshared(int pipeline_stage) const;
+  // Outermost commit of a copy-on-write.  Marks the cycler dirty only if the
+  // stages actually ended up differing.
+  void publish_write_stage(int pipeline_stage);
+  // Called at the top of cycle*(), with _lock held.
+  void propagate_upstream_locked();
   // The live CData for code holding _lock: the in-flight write copy (_pending)
   // if a write is outstanding, else the published pointer.  A write is only
   // outstanding under the lock to the thread that holds it, so this gives that
@@ -141,6 +146,10 @@ private:
     patomic<CycleData *> _cdata;
     CycleData *_pending = nullptr;
     int _writes_outstanding = 0;
+    // Set by write_stage_upstream(); OR'd across nested writers, cleared on
+    // commit.  _write_force_to_0 extends the propagation to stage 0.
+    bool _write_upstream = false;
+    bool _write_force_to_0 = false;
     // The thread with a copy-on-write in flight (it owns _pending).  Its own
     // lock-free reads steer to _pending for read-your-writes; every other
     // thread still loads the immutable published _cdata.  Null in in-place mode
@@ -163,6 +172,17 @@ private:
   // stage.
   CycleDataNode _single_data;
   CycleDataNode *_data;
+
+  // Upstream propagation owed to the next cycle: bit k means stage k may still
+  // adopt _upstream_stage's pointer, having held what that stage's writer
+  // replaced without being written since.  Settled at cycle() rather than at
+  // commit, because publishing upstream immediately re-shares this stage's
+  // pointer and denies the in-place path to later writes in the same frame.
+  // A bitmask, not a remembered pointer: the replaced pointer is retired and
+  // its address could be reused.  write_stage() clears a bit when that stage is
+  // written directly.
+  unsigned char _upstream_mask = 0;
+  signed char _upstream_stage = -1;
 
   CyclerMutex _lock;
 
