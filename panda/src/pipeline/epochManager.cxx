@@ -46,6 +46,21 @@ namespace {
 
 static thread_local bool tl_in_reclaim = false;
 
+// Declared ahead of the buffer so the buffer's destructor can call it.
+static void flush_retire_buf();
+
+// This thread's retired pointers, awaiting hand-over to the shared queue.  Not
+// on EpochParticipant, which must not grow; see epochManager.h.  The destructor
+// flushes because the Thread object is usually released by whoever joins the
+// thread, on that joiner's thread, where it can no longer reach this buffer.
+namespace {
+  struct RetireBuf {
+    pvector<CycleData *> v;
+    ~RetireBuf() { flush_retire_buf(); }
+  };
+}
+static thread_local RetireBuf tl_retire;
+
 /**
  * True while this thread is inside try_reclaim() freeing CycleData.
  */
@@ -56,6 +71,7 @@ is_reclaiming() {
 
 EpochParticipant::
 ~EpochParticipant() {
+  EpochManager::flush_retired(*this);
   if (registered) {
     EpochManager::unregister_participant(this);
   }
@@ -144,15 +160,58 @@ retire(CycleData *cd) {
   if (cd == nullptr) {
     return;
   }
+
+  // Buffer locally and hand the batch over when it fills.  Taking the shared
+  // lock per pointer serializes every copy-on-write in the process, which an
+  // animating scene does tens of thousands of times a frame.
+  EpochParticipant &p = Thread::get_current_thread()->epoch_participant();
+  tl_retire.v.push_back(cd);
+  if (++p.retire_pending >= retire_batch) {
+    flush_retired(p);
+  }
+}
+
+/**
+ * Moves this thread's buffered pointers into the shared queue under one lock.
+ * Stamping the epoch at hand-over rather than at retire() only ever moves an
+ * entry later in the queue, delaying its free, never advancing it.
+ */
+static void flush_retire_buf() {
+  if (tl_retire.v.empty()) {
+    return;
+  }
+  size_t n = tl_retire.v.size();
   {
     EbrRegistry *r = get_registry();
     MutexHolder hold(r->retired_lock);
     // Stamp under the lock: the global epoch is monotonic, so reads serialized
     // here are non-decreasing and retired stays sorted for the front-drain.
-    uint64_t e = _global_epoch.load(std::memory_order_acquire);
-    r->retired.push_back({e, cd});
+    uint64_t e = EpochManager::get_global_epoch();
+    for (CycleData *cd : tl_retire.v) {
+      r->retired.push_back({e, cd});
+    }
   }
-  _retired_count.fetch_add(1, std::memory_order_relaxed);
+  tl_retire.v.clear();
+  EpochManager::note_retired(n);
+}
+
+/**
+ * Hands this thread's buffered pointers over.  Called when the buffer fills,
+ * when the thread leaves its outermost critical section, and when the
+ * participant is destroyed; a buffered pointer cannot be reclaimed until then.
+ */
+void EpochManager::
+flush_retired(EpochParticipant &p) {
+  flush_retire_buf();
+  p.retire_pending = 0;
+}
+
+/**
+ * Adds to the shared retired-entry count, for flush_retire_buf().
+ */
+void EpochManager::
+note_retired(size_t n) {
+  _retired_count.fetch_add(n, std::memory_order_relaxed);
 }
 
 // Min slot among in-CS participants (slot != 0), or UINT64_MAX if all
@@ -246,6 +305,7 @@ consider_reclaim(EpochParticipant &p) {
   if (p.depth != 0) {
     return;
   }
+  flush_retired(p);
   if ((++p.reclaim_ticks & 7u) != 0) {
     return;
   }
