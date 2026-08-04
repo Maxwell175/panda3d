@@ -17,7 +17,6 @@
 #include "indent.h"
 #include "transformTable.h"
 
-PipelineCycler<VertexTransform::CData> VertexTransform::_global_cycler;
 UpdateSeq VertexTransform::_next_modified;
 
 TypeHandle VertexTransform::_type_handle;
@@ -94,12 +93,9 @@ write(std::ostream &out, int indent_level) const {
  * Geom::get_modified(), but it is in a different space.
  */
 UpdateSeq VertexTransform::
-get_next_modified(Thread *current_thread) {
-  CDWriter cdatag(_global_cycler, true, current_thread);
-  ++_next_modified;
-  cdatag->_modified = _next_modified;
-
-  return _next_modified;
+get_next_modified(Thread *) {
+  // Lock-free: UpdateSeq::operator++ is a compare-exchange loop.
+  return ++_next_modified;
 }
 
 /**

@@ -27,9 +27,8 @@ get_modified(Thread *current_thread) const {
  * VertexTransforms have changed value recently.
  */
 INLINE UpdateSeq VertexTransform::
-get_global_modified(Thread *current_thread) {
-  CDReader cdata(_global_cycler, current_thread);
-  return cdata->_modified;
+get_global_modified(Thread *) {
+  return _next_modified;
 }
 
 /**

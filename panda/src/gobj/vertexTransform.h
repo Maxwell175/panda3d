@@ -79,7 +79,14 @@ private:
   typedef CycleDataReader<CData> CDReader;
   typedef CycleDataWriter<CData> CDWriter;
 
-  static PipelineCycler<CData> _global_cycler;
+  // The highest modified counter handed out so far, process-wide.  Deliberately
+  // not a pipeline cycler: every joint transform bumps this, so a cycler here
+  // put one global mutex in front of every animation write.  UpdateSeq is
+  // atomic, so it needs no lock.
+  //
+  // Global rather than per-stage is fine: this only gates the authoritative
+  // test (TransformBlend::_modified), so reading a newer value than one's own
+  // stage causes a redundant recompute, never a stale result.
   static UpdateSeq _next_modified;
 
 public:
