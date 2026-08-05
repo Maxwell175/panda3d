@@ -167,17 +167,7 @@ eglGraphicsPipe() {
       << "Successfully initialized EGL display, got version " << major << "." << minor << "\n";
   }
 
-#if defined(OPENGLES_1) || defined(OPENGLES_2)
-  if (!eglBindAPI(EGL_OPENGL_ES_API)) {
-    egldisplay_cat.error()
-      << "Couldn't bind EGL to the OpenGL ES API: "
-      << get_egl_error_string(eglGetError()) << "\n";
-#else
-  if (!eglBindAPI(EGL_OPENGL_API)) {
-    egldisplay_cat.error()
-      << "Couldn't bind EGL to the OpenGL API: "
-      << get_egl_error_string(eglGetError()) << "\n";
-#endif
+  if (!egl_bind_api()) {
     _is_valid = false;
     return;
   }

@@ -91,3 +91,24 @@ const std::string get_egl_error_string(int error) {
     default: return "Unknown error";
   }
 }
+
+/**
+ * Binds EGL to the rendering API this module was built for.  The binding is
+ * per-thread, so every thread that creates a context has to do it.
+ */
+bool egl_bind_api() {
+#if defined(OPENGLES_1) || defined(OPENGLES_2)
+  EGLenum api = EGL_OPENGL_ES_API;
+  const char *api_name = "OpenGL ES";
+#else
+  EGLenum api = EGL_OPENGL_API;
+  const char *api_name = "OpenGL";
+#endif
+  if (!eglBindAPI(api)) {
+    egldisplay_cat.error()
+      << "Couldn't bind EGL to the " << api_name << " API: "
+      << get_egl_error_string(eglGetError()) << "\n";
+    return false;
+  }
+  return true;
+}

@@ -123,6 +123,12 @@ choose_pixel_format(const FrameBufferProperties &properties,
   _fbconfig = 0;
   _fbprops.clear();
 
+  // Not necessarily the thread that made the pipe, and the binding is
+  // per-thread; without this eglCreateContext below fails.
+  if (!egl_bind_api()) {
+    return;
+  }
+
   int attrib_list[] = {
 #if defined(OPENGLES_1)
     EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT,
