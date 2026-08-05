@@ -2884,17 +2884,42 @@ thread_main() {
       }
       break;
 
+    // Every state below that touches the engine needs the same epoch coverage
+    // TS_do_frame takes.  do_windows() in particular reaches window resize
+    // handling -- process_events() -> set_properties_now() ->
+    // GraphicsOutput::set_size_and_recalc() ->
+    // DisplayRegion::compute_pixels_all_stages(), which opens a CDWriter on
+    // every pipeline stage -- and tripped assert_in_epoch three times at window
+    // creation on any threaded run.  do_pending() is the same function
+    // TS_do_frame already wraps, so TS_do_release and TS_terminate need it for
+    // the same reason.
+    //
+    // Scoped per state, never hoisted around the switch: TS_wait blocks on the
+    // condition variable, and a thread holding a published epoch slot while it
+    // idles pins the reclaim floor, so nothing retired anywhere in the process
+    // can ever be freed.  TS_callback is left alone deliberately -- it runs
+    // caller-supplied code of unknown blocking behaviour, and the caller owns
+    // its own framing.
     case TS_do_flip:
-      do_flip(_engine, current_thread);
+      {
+        EpochHolder epoch(current_thread);
+        do_flip(_engine, current_thread);
+      }
       break;
 
     case TS_do_release:
-      do_pending(_engine, current_thread);
+      {
+        EpochHolder epoch(current_thread);
+        do_pending(_engine, current_thread);
+      }
       break;
 
     case TS_do_windows:
-      do_windows(_engine, current_thread);
-      do_pending(_engine, current_thread);
+      {
+        EpochHolder epoch(current_thread);
+        do_windows(_engine, current_thread);
+        do_pending(_engine, current_thread);
+      }
       break;
 
     case TS_callback:
@@ -2903,8 +2928,11 @@ thread_main() {
       break;
 
     case TS_terminate:
-      do_pending(_engine, current_thread);
-      do_close(_engine, current_thread);
+      {
+        EpochHolder epoch(current_thread);
+        do_pending(_engine, current_thread);
+        do_close(_engine, current_thread);
+      }
       _thread_state = TS_done;
       _cv_done.notify();
       return;
