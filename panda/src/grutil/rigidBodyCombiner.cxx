@@ -83,6 +83,8 @@ make_copy() const {
  */
 void RigidBodyCombiner::
 collect() {
+  LightMutexHolder holder(_collect_lock);
+
   _internal_root = new GeomNode(get_name());
   _internal_transforms.clear();
   _vd_table.clear();
@@ -137,15 +139,22 @@ cull_callback(CullTraverser *trav, CullTraverserData &data) {
   // Pretend that all of our transforms have been modified (since we don't
   // really know which ones have).
   Thread *current_thread = Thread::get_current_thread();
-  Transforms::iterator ti;
-  for (ti = _internal_transforms.begin();
-       ti != _internal_transforms.end();
-       ++ti) {
-    (*ti)->mark_modified(current_thread);
+  PT(PandaNode) internal_root;
+  {
+    // Held across the marking loop, which is short and takes no scene-graph locks of its own, but
+    // dropped before the traversal below -- a whole subtree walk is not something to hold a lock over.
+    LightMutexHolder holder(_collect_lock);
+    internal_root = _internal_root;
+    Transforms::iterator ti;
+    for (ti = _internal_transforms.begin();
+         ti != _internal_transforms.end();
+         ++ti) {
+      (*ti)->mark_modified(current_thread);
+    }
   }
 
   // Render the internal scene only--this is the optimized scene.
-  trav->traverse_down(data, _internal_root);
+  trav->traverse_down(data, internal_root);
 
   // Do not directly render the nodes beneath this node.
   return false;

@@ -273,7 +273,9 @@ cull_callback(CullTraverser *trav, CullTraverserData &data) {
       data._state->get_attrib(clip);
       data._state->get_attrib(scissor);
       if (activate_region(transform, sort, clip, scissor)) {
-        pg_trav->_top->add_region(region);
+        // Into the group this traversal is collecting into, not through the PGTop's own pointer to
+        // it -- that one is written by the app thread and this is the cull thread.
+        pg_trav->add_region(region);
       }
     }
   }

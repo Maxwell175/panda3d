@@ -86,19 +86,37 @@ bool PGTop::
 cull_callback(CullTraverser *trav, CullTraverserData &data) {
   // We create a new MouseWatcherGroup for the purposes of collecting a new
   // set of regions visible onscreen.
+  //
+  // This runs on the cull thread while set_mouse_watcher() may be running on the app thread, so both
+  // members are taken in one critical section and everything after it works from the locals.  Reading
+  // _watcher again further down is what used to crash: set_mouse_watcher(nullptr) between the test
+  // and the use left a null to dereference.
+  PT(MouseWatcher) watcher;
   PT(PGMouseWatcherGroup) old_watcher_group;
-  if (_watcher_group != nullptr) {
-    _watcher_group->clear_top(this);
+  PT(PGMouseWatcherGroup) new_watcher_group;
+  {
+    LightMutexHolder holder(_watcher_lock);
+    watcher = _watcher;
     old_watcher_group = _watcher_group;
-    _watcher_group = new PGMouseWatcherGroup(this);
+    if (old_watcher_group != nullptr) {
+      new_watcher_group = new PGMouseWatcherGroup(this);
+      _watcher_group = new_watcher_group;
+    }
+  }
+
+  if (old_watcher_group != nullptr) {
+    // Outside the lock: the group takes its own.
+    old_watcher_group->clear_top(this);
   }
 
   // Now subsitute for the normal CullTraverser a special one of our own
   // choosing.  This just carries around a pointer back to the PGTop node, for
-  // the convenience of PGItems to register themselves as they are drawn.
+  // the convenience of PGItems to register themselves as they are drawn, along
+  // with the group they are to be collected into.
   PGCullTraverser pg_trav(this, trav);
   pg_trav.local_object();
   pg_trav._sort_index = _start_sort;
+  pg_trav._watcher_group = new_watcher_group;
   pg_trav.traverse_below(data);
   pg_trav.end_traverse();
 
@@ -106,9 +124,12 @@ cull_callback(CullTraverser *trav, CullTraverserData &data) {
   // shouldn't do this until the frame that we're about to render has been
   // presented; otherwise, we may make regions active before they are actually
   // visible.  But no one has complained about this so far.
-  if (_watcher_group != nullptr) {
-    nassertr(_watcher != nullptr, false);
-    _watcher->replace_group(old_watcher_group, _watcher_group);
+  //
+  // The watcher can legitimately be null here even with a group in hand, if the app thread cleared it
+  // during the traversal above; there is then nothing to tell, and the group we built is simply
+  // dropped.
+  if (new_watcher_group != nullptr && watcher != nullptr) {
+    watcher->replace_group(old_watcher_group, new_watcher_group);
   }
 
   // We've taken care of the traversal, thank you.
@@ -121,18 +142,32 @@ cull_callback(CullTraverser *trav, CullTraverserData &data) {
  */
 void PGTop::
 set_mouse_watcher(MouseWatcher *watcher) {
-  if (_watcher_group != nullptr) {
-    _watcher_group->clear_top(this);
-  }
-  if (_watcher != nullptr) {
-    _watcher->remove_group(_watcher_group);
+  // The swap happens under the lock; the calls into the old and new watchers happen outside it, since
+  // those take locks of their own and a cull in flight may already be inside them.
+  PT(MouseWatcher) old_watcher;
+  PT(PGMouseWatcherGroup) old_watcher_group;
+  PT(PGMouseWatcherGroup) new_watcher_group;
+  {
+    LightMutexHolder holder(_watcher_lock);
+    old_watcher = _watcher;
+    old_watcher_group = _watcher_group;
+
+    _watcher = watcher;
+    _watcher_group = nullptr;
+
+    if (watcher != nullptr) {
+      new_watcher_group = new PGMouseWatcherGroup(this);
+      _watcher_group = new_watcher_group;
+    }
   }
 
-  _watcher = watcher;
-  _watcher_group = nullptr;
-
-  if (_watcher != nullptr) {
-    _watcher_group = new PGMouseWatcherGroup(this);
-    _watcher->add_group(_watcher_group);
+  if (old_watcher_group != nullptr) {
+    old_watcher_group->clear_top(this);
+  }
+  if (old_watcher != nullptr && old_watcher_group != nullptr) {
+    old_watcher->remove_group(old_watcher_group);
+  }
+  if (watcher != nullptr) {
+    watcher->add_group(new_watcher_group);
   }
 }

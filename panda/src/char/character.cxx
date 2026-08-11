@@ -168,22 +168,47 @@ cull_callback(CullTraverser *trav, CullTraverserData &data) {
   // We may need a better way to do this optimization later, to handle
   // characters that might animate themselves in front of the view frustum.
 
-  if (_do_lod_animation) {
+  // The whole band is taken in one critical section, so the distances used below are the ones a single
+  // call to set_lod_animation() stored -- never a mix of an old far and a new near.  The delay is
+  // applied after the lock is dropped, since set_lod_current_delay() walks the part bundles.
+  bool do_lod_animation;
+  LPoint3 lod_center;
+  PN_stdfloat lod_far_distance, lod_near_distance, lod_delay_factor;
+  {
+    LightMutexHolder holder(_lod_lock);
+    do_lod_animation = _do_lod_animation;
+    lod_center = _lod_center;
+    lod_far_distance = _lod_far_distance;
+    lod_near_distance = _lod_near_distance;
+    lod_delay_factor = _lod_delay_factor;
+  }
+
+  if (do_lod_animation) {
     int this_frame = ClockObject::get_global_clock()->get_frame_count();
 
     CPT(TransformState) rel_transform = get_rel_transform(trav, data);
-    LPoint3 center = _lod_center * rel_transform->get_mat();
+    LPoint3 center = lod_center * rel_transform->get_mat();
     PN_stdfloat dist2 = center.dot(center);
 
-    if (this_frame != _view_frame || dist2 < _view_distance2) {
-      _view_frame = this_frame;
-      _view_distance2 = dist2;
+    bool apply;
+    {
+      LightMutexHolder holder(_lod_lock);
+      apply = (this_frame != _view_frame || dist2 < _view_distance2);
+      if (apply) {
+        _view_frame = this_frame;
+        _view_distance2 = dist2;
+      }
+    }
 
+    if (apply) {
       // Now compute the lod delay.
       PN_stdfloat dist = sqrt(dist2);
       double delay = 0.0;
-      if (dist > _lod_near_distance) {
-        delay = _lod_delay_factor * (dist - _lod_near_distance) / (_lod_far_distance - _lod_near_distance);
+      // The band can be degenerate even under the lock, if a caller passed far == near; that is not a
+      // race but it divides by zero just the same, and used to rely on the nassertr below -- which a
+      // release build compiles out.
+      if (dist > lod_near_distance && lod_far_distance > lod_near_distance) {
+        delay = lod_delay_factor * (dist - lod_near_distance) / (lod_far_distance - lod_near_distance);
         nassertr(delay > 0.0, false);
       }
       set_lod_current_delay(delay);
@@ -295,12 +320,17 @@ set_lod_animation(const LPoint3 &center,
                   PN_stdfloat delay_factor) {
   nassertv(far_distance >= near_distance);
   nassertv(delay_factor >= 0.0f);
-  _lod_center = center;
-  _lod_far_distance = far_distance;
-  _lod_near_distance = near_distance;
-  _lod_delay_factor = delay_factor;
-  _do_lod_animation = (_lod_far_distance > _lod_near_distance && _lod_delay_factor > 0.0);
-  if (!_do_lod_animation) {
+  bool do_lod_animation;
+  {
+    LightMutexHolder holder(_lod_lock);
+    _lod_center = center;
+    _lod_far_distance = far_distance;
+    _lod_near_distance = near_distance;
+    _lod_delay_factor = delay_factor;
+    _do_lod_animation = (far_distance > near_distance && delay_factor > 0.0);
+    do_lod_animation = _do_lod_animation;
+  }
+  if (!do_lod_animation) {
     set_lod_current_delay(0.0);
   }
 }

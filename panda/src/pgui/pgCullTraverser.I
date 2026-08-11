@@ -21,3 +21,14 @@ PGCullTraverser(PGTop *top, CullTraverser *trav) :
 {
   _sort_index = 0;
 }
+
+/**
+ * Adds a region to the group this traversal is collecting into.  Does nothing if the PGTop has no
+ * MouseWatcher, in which case there is no group to collect into.
+ */
+INLINE void PGCullTraverser::
+add_region(MouseWatcherRegion *region) {
+  if (_watcher_group != nullptr) {
+    _watcher_group->add_region(region);
+  }
+}

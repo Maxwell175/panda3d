@@ -22,6 +22,7 @@
 #include "pointerTo.h"
 #include "sceneGraphAnalyzer.h"
 #include "pStatCollector.h"
+#include "lightMutex.h"
 
 class PandaNode;
 class GraphicsChannel;
@@ -62,6 +63,9 @@ private:
   void do_update(Thread *current_thread);
 
 private:
+  // App thread writes these in setup_window()/clear_window(); the cull thread reads _display_region in
+  // cull_callback(), which here dereferences it with no guard at all.  See FrameRateMeter.
+  LightMutex _window_lock;
   PT(GraphicsOutput) _window;
   PT(DisplayRegion) _display_region;
   NodePath _root;

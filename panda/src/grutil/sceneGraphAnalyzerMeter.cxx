@@ -91,8 +91,12 @@ setup_window(GraphicsOutput *window) {
   _root.set_bin("unsorted", 0);
 
   // Create a display region that covers the entire window.
-  _display_region = _window->make_display_region();
-  _display_region->set_sort(scene_graph_analyzer_meter_layer_sort);
+  PT(DisplayRegion) display_region = _window->make_display_region();
+  display_region->set_sort(scene_graph_analyzer_meter_layer_sort);
+  {
+    LightMutexHolder holder(_window_lock);
+    _display_region = display_region;
+  }
 
   // Finally, we need a camera to associate with the display region.
   PT(Camera) camera = new Camera("scene_graph_analyzer_camera");
@@ -111,7 +115,7 @@ setup_window(GraphicsOutput *window) {
 
   camera->set_lens(lens);
   camera->set_scene(_root);
-  _display_region->set_camera(camera_np);
+  display_region->set_camera(camera_np);
 }
 
 /**
@@ -119,10 +123,17 @@ setup_window(GraphicsOutput *window) {
  */
 void SceneGraphAnalyzerMeter::
 clear_window() {
-  if (_window != nullptr) {
-    _window->remove_display_region(_display_region);
+  PT(GraphicsOutput) window;
+  PT(DisplayRegion) display_region;
+  {
+    LightMutexHolder holder(_window_lock);
+    window = _window;
+    display_region = _display_region;
     _window = nullptr;
     _display_region = nullptr;
+  }
+  if (window != nullptr) {
+    window->remove_display_region(display_region);
   }
   _root = NodePath();
 }
@@ -147,6 +158,17 @@ clear_window() {
  */
 bool SceneGraphAnalyzerMeter::
 cull_callback(CullTraverser *trav, CullTraverserData &data) {
+  // Taken once into a local, for the reason FrameRateMeter takes it: clear_window() runs on the app
+  // thread and this runs on the cull thread, and this one had no guard at all.
+  PT(DisplayRegion) display_region;
+  {
+    LightMutexHolder holder(_window_lock);
+    display_region = _display_region;
+  }
+  if (display_region == nullptr) {
+    return false;
+  }
+
   Thread *current_thread = trav->get_current_thread();
 
   // Statistics
@@ -154,8 +176,8 @@ cull_callback(CullTraverser *trav, CullTraverserData &data) {
 
   // This is probably a good time to check if the aspect ratio on the window
   // has changed.
-  int width = _display_region->get_pixel_width();
-  int height = _display_region->get_pixel_height();
+  int width = display_region->get_pixel_width();
+  int height = display_region->get_pixel_height();
   PN_stdfloat aspect_ratio = 1;
   if (width != 0 && height != 0) {
     aspect_ratio = (PN_stdfloat)height / (PN_stdfloat)width;

@@ -28,6 +28,7 @@ PGTop(const PGTop &copy) :
  */
 INLINE MouseWatcher *PGTop::
 get_mouse_watcher() const {
+  LightMutexHolder holder(_watcher_lock);
   return _watcher;
 }
 
@@ -37,6 +38,7 @@ get_mouse_watcher() const {
  */
 INLINE MouseWatcherGroup *PGTop::
 get_group() const {
+  LightMutexHolder holder(_watcher_lock);
   return _watcher_group;
 }
 
@@ -74,7 +76,15 @@ get_start_sort() const {
  */
 INLINE void PGTop::
 add_region(MouseWatcherRegion *region) {
-  if (_watcher_group != nullptr) {
-    _watcher_group->add_region(region);
+  // The cull traversal no longer comes through here -- it collects into the group carried on the
+  // PGCullTraverser -- but this stays part of the public interface, so it takes the lock to read the
+  // pointer and releases it before calling into the group, which has a lock of its own.
+  PT(PGMouseWatcherGroup) group;
+  {
+    LightMutexHolder holder(_watcher_lock);
+    group = _watcher_group;
+  }
+  if (group != nullptr) {
+    group->add_region(region);
   }
 }

@@ -28,6 +28,7 @@
 #include "transformTable.h"
 #include "transformBlendTable.h"
 #include "sliderTable.h"
+#include "lightMutex.h"
 
 class CharacterJointBundle;
 
@@ -131,6 +132,14 @@ private:
 
   double _last_auto_update;
 
+  // The animation-LOD band.  set_lod_animation() writes these on the app thread; cull_callback() reads
+  // them on the cull thread and divides by (_lod_far_distance - _lod_near_distance).  Unsynchronized,
+  // a caller turning the band off -- set_lod_animation(centre, 0, 0, 0), which is how it is disabled --
+  // stores the two zeroed distances *before* it clears _do_lod_animation, so a cull landing in that
+  // window takes the branch and divides by zero.  The resulting infinite delay goes straight to
+  // set_lod_current_delay(), where it is a pose held forever rather than a crash: silent, and only on
+  // a threaded cull.
+  LightMutex _lod_lock;
   int _view_frame;
   double _view_distance2;
 

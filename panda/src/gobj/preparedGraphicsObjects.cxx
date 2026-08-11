@@ -1102,7 +1102,18 @@ release_index_buffer(IndexBufferContext *ibc) {
 
   ibc->get_data()->clear_prepared(this);
 
-  size_t data_size_bytes = ibc->get_data()->get_data_size_bytes();
+  // A primitive prepared while indexed can be non-indexed by the time it is released:
+  // set_nonindexed_vertices() and clear_vertices() null the index array without releasing the
+  // contexts, and scene flattening does exactly that to text geometry.  get_data_size_bytes() then
+  // trips its nassertr -- which a release build already turns into the 0 below, so this is the same
+  // number said without the noise, and without aborting a development build.
+  //
+  // Seen as a repeating "!cdata->_vertices.is_null()" from EpochManager::try_reclaim(), which is where
+  // a retired Geom::CData destroys its primitives; a frame-rate meter regenerating its text every
+  // update is enough to make it constant.
+  size_t data_size_bytes = ibc->get_data()->is_indexed()
+    ? (size_t)ibc->get_data()->get_data_size_bytes()
+    : 0;
   GeomEnums::UsageHint usage_hint = ibc->get_data()->get_usage_hint();
 
   // We have to set the Data pointer to NULL at this point, since the Data

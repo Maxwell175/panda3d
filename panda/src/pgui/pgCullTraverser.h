@@ -32,6 +32,15 @@ public:
   PGTop *_top;
   int _sort_index;
 
+  // The group this traversal is collecting regions into.  Carried here rather than reached through
+  // _top because PGTop's own pointer to it is written by the app thread, and reading it once per
+  // PGItem from the cull thread is the same race cull_callback() is guarded against -- with the
+  // added hazard that a torn PT() read corrupts a refcount.  The traversal has exactly one group for
+  // its whole life, so passing it down is also simply what the traverser is for.
+  PT(PGMouseWatcherGroup) _watcher_group;
+
+  INLINE void add_region(MouseWatcherRegion *region);
+
 public:
   static TypeHandle get_class_type() {
     return _type_handle;

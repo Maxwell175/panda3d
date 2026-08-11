@@ -21,6 +21,7 @@
 #include "displayRegion.h"
 #include "pointerTo.h"
 #include "pStatCollector.h"
+#include "lightMutex.h"
 
 class GraphicsChannel;
 class ClockObject;
@@ -63,6 +64,11 @@ private:
   void do_update(Thread *current_thread);
 
 private:
+  // setup_window() and clear_window() run on the app thread; cull_callback() reads _display_region on
+  // the cull thread.  clear_window() nulling it between cull_callback()'s nassertr -- which a release
+  // build compiles out -- and its first use is a null dereference in the render thread.  Same shape as
+  // the PGTop/MouseWatcher race.  Held only across the pointer reads, never across a call out.
+  LightMutex _window_lock;
   PT(GraphicsOutput) _window;
   PT(DisplayRegion) _display_region;
   NodePath _root;

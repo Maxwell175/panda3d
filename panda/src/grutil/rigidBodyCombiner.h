@@ -15,6 +15,7 @@
 #define RIGIDBODYCOMBINER_H
 
 #include "pandabase.h"
+#include "lightMutex.h"
 
 #include "pandaNode.h"
 #include "nodeVertexTransform.h"
@@ -64,6 +65,12 @@ private:
   PT(GeomVertexData) convert_vd(const VertexTransform *transform,
                                 const GeomVertexData *orig);
 
+  // collect() rebuilds both of these on the app thread -- _internal_transforms by clear() followed by
+  // push_back() -- while cull_callback() iterates the vector on the cull thread and traverses into the
+  // root.  Clearing and reallocating a vector under a live iterator is a use-after-free, not a stale
+  // read.  collect() is documented as expensive and infrequent, so it simply holds the lock for its
+  // duration and cull sees either the whole old build or the whole new one.
+  LightMutex _collect_lock;
   PT(PandaNode) _internal_root;
 
   typedef pvector< PT(NodeVertexTransform) > Transforms;

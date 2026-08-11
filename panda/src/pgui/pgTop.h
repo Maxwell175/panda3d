@@ -21,6 +21,7 @@
 #include "pandaNode.h"
 #include "mouseWatcher.h"
 #include "pointerTo.h"
+#include "lightMutex.h"
 
 class GraphicsStateGuardian;
 class PGMouseWatcherGroup;
@@ -64,6 +65,20 @@ public:
   INLINE void clear_regions();
 
 private:
+  // Written by set_mouse_watcher() and the destructor on the app thread, and read and swapped by
+  // cull_callback() on the cull thread.  Neither is pipelined -- cull_callback() runs against the live
+  // node rather than a CycleData copy -- so with a real cull thread these are a plain data race, and a
+  // PT() assignment torn across two threads corrupts a refcount rather than merely reading stale.
+  //
+  // The failure observed was the narrow one: set_mouse_watcher(nullptr) landing between
+  // cull_callback()'s test of _watcher_group and its use of _watcher, leaving a null _watcher to be
+  // dereferenced.  The nassertr() there catches it in a development build and is compiled out of a
+  // release one, so it presented as a segfault inside MouseWatcher::replace_group() taking a lock at
+  // offset 0x48 of nullptr.
+  //
+  // The lock is only ever held across pointer swaps, never across a call into MouseWatcher or a group
+  // (both of which take locks of their own), so it introduces no lock ordering.
+  mutable LightMutex _watcher_lock;
   PT(MouseWatcher) _watcher;
   PT(PGMouseWatcherGroup) _watcher_group;
   int _start_sort;
