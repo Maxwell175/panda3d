@@ -179,7 +179,7 @@ void NavMeshBuilder::add_polygon(LPoint3 a, LPoint3 b, LPoint3 c) {
   mat_to_y.xform_point_in_place(c);
   update_bounds(c);
 
-  _untracked_tris.insert((NavTriVertGroup){a, b, c});
+  _untracked_tris.insert(NavTriVertGroup(a, b, c));
 }
 
 /**
@@ -256,7 +256,7 @@ void NavMeshBuilder::process_primitive(std::set<NavTriVertGroup> &tris, const Ge
       transform.xform_point_in_place(v3);
       update_bounds(v3);
 
-      tris.insert((NavTriVertGroup){v1, v2, v3});
+      tris.insert(NavTriVertGroup(v1, v2, v3));
     } else if (e - s > 3) {
       for (int i = s + 2; i < e; ++i) {
         int a = prim->get_vertex(s);
@@ -277,7 +277,7 @@ void NavMeshBuilder::process_primitive(std::set<NavTriVertGroup> &tris, const Ge
         transform.xform_point_in_place(v3);
         update_bounds(v3);
 
-        tris.insert((NavTriVertGroup){v1, v2, v3});
+        tris.insert(NavTriVertGroup(v1, v2, v3));
       }
     }
     else continue;
@@ -502,7 +502,8 @@ int NavMeshBuilder::rasterizeTileLayers(
   }
 
   int ntiles = 0;
-  TileCacheData _tiles[_params.get_max_layers_per_tile()];
+  // Sized at runtime, so not an array: MSVC has no variable-length arrays.
+  pvector<TileCacheData> _tiles(_params.get_max_layers_per_tile());
 
   for (int i = 0; i < rcMin(lset->nlayers, _params.get_max_layers_per_tile()); ++i)
   {
@@ -631,8 +632,8 @@ PT(NavMesh) NavMeshBuilder::build() {
 
   for (int y = 0; y < th; ++y) {
     for (int x = 0; x < tw; ++x) {
-      TileCacheData tiles[_params.get_max_layers_per_tile()];
-      memset(tiles, 0, sizeof(tiles));
+      // Value-initialised, which is the zeroing the memset used to do.
+      pvector<TileCacheData> tiles(_params.get_max_layers_per_tile());
       tileBmin[0] = _mesh_bMin[0] + x*tcs;
       tileBmin[1] = _mesh_bMin[1];
       tileBmin[2] = _mesh_bMin[2] + y*tcs;
@@ -641,7 +642,7 @@ PT(NavMesh) NavMeshBuilder::build() {
       tileBmax[1] = _mesh_bMax[1];
       tileBmax[2] = _mesh_bMin[2] + (y+1)*tcs;
       int ntiles = rasterizeTileLayers(x, y, tileBmin, tileBmax,
-                                       verts, tris, tiles, _params.get_max_layers_per_tile());
+                                       verts, tris, tiles.data(), _params.get_max_layers_per_tile());
 
       for (int i = 0; i < ntiles; ++i)
       {
@@ -769,8 +770,8 @@ update_nav_mesh(NavMesh *nav_mesh_obj, dtTileCache *tile_cache) {
   float tileBmin[3] = { 0, 0, 0 };
   float tileBmax[3] = { 0, 0, 0 };
   for (auto &tile_coods : tiles_to_regen) {
-    TileCacheData tiles[_params.get_max_layers_per_tile()];
-    memset(tiles, 0, sizeof(tiles));
+    // Value-initialised, which is the zeroing the memset used to do.
+    pvector<TileCacheData> tiles(_params.get_max_layers_per_tile());
     tileBmin[0] = orig_bound_min[0] + static_cast<float>(tile_coods.first) * _params.get_tile_cell_size();
     tileBmin[1] = _mesh_bMin[1];
     tileBmin[2] = orig_bound_min[2] + static_cast<float>(tile_coods.second) * _params.get_tile_cell_size();
@@ -780,11 +781,11 @@ update_nav_mesh(NavMesh *nav_mesh_obj, dtTileCache *tile_cache) {
     tileBmax[2] = orig_bound_min[2] + static_cast<float>(tile_coods.second+1) * _params.get_tile_cell_size();
 
     int ntiles = rasterizeTileLayers(tile_coods.first, tile_coods.second, tileBmin, tileBmax,
-                                     verts, tris, tiles, _params.get_max_layers_per_tile());
+                                     verts, tris, tiles.data(), _params.get_max_layers_per_tile());
 
-    dtCompressedTileRef old_layers[_params.get_max_layers_per_tile()];
+    pvector<dtCompressedTileRef> old_layers(_params.get_max_layers_per_tile());
     int old_nlayers = tile_cache->getTilesAt(tile_coods.first, tile_coods.second,
-                                              reinterpret_cast<dtCompressedTileRef *>(&old_layers), _params.get_max_layers_per_tile());
+                                              old_layers.data(), _params.get_max_layers_per_tile());
     for (int i = 0; i < old_nlayers; ++i) {
       tile_cache->removeTile(old_layers[i], nullptr, nullptr);
     }
