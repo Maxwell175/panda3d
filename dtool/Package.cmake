@@ -89,6 +89,7 @@ if(THIRDPARTY_DIRECTORY)
     Assimp
     Bullet
     Cg
+    Detour
     Eigen3
     FCollada
     FFMPEG
@@ -105,6 +106,7 @@ if(THIRDPARTY_DIRECTORY)
     OpenSSL
     OpusFile
     PNG
+    Recast
     SWResample
     SWScale
     Tiff
@@ -133,6 +135,8 @@ if(THIRDPARTY_DIRECTORY)
       set(_package "ffmpeg") # These are also part of FFmpeg
     elseif(_package STREQUAL "vorbisfile")
       set(_package "vorbis")
+    elseif(_package STREQUAL "detour")
+      set(_package "recast")
     endif()
 
     # Set search path
@@ -935,3 +939,26 @@ package_option(VRPN
   are building Panda3D for a fixed VRPN-based VR installation.")
 
 package_status(VRPN "VRPN")
+
+
+#
+# ------------ Recast navigation ------------
+#
+
+# Recast
+find_package(Recast QUIET)
+
+package_option(Recast
+        "Enable Recast Navigation support."
+        IMPORTED_AS Recast::Recast)
+
+package_status(Recast "Recast")
+
+# Detour
+find_package(Detour QUIET)
+
+package_option(Detour
+    "Enable Recast/Detour Navigation support."
+    IMPORTED_AS Detour::Detour)
+
+package_status(Detour "Detour")
