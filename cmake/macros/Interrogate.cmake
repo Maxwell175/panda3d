@@ -302,6 +302,20 @@ define_property(GLOBAL PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS
   FULL_DOCS  "Populated by add_csharp_module IMPORT, consumed by _interrogate_csharp_pass2")
 set_property(GLOBAL PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS "")
 
+# The same layout again, but written to a file for interrogate_csharp to read
+# instead of being baked into each module's command line.  A command line is
+# fixed when its module is declared, so the first module declared carries only
+# itself and cannot rank any other -- modules then disagree about which module
+# owns a shared collection, and emit or reference different classes for it.
+# file(GENERATE) runs after the whole project is configured, so this file always
+# holds every module.  It lands under the pass-2 --search-dir, which is scanned
+# recursively for the .in and .csharpcoll sidecars this joins.
+add_library(p3csharp_modmap INTERFACE)
+set_property(TARGET p3csharp_modmap PROPERTY CSHARP_MODMAP_LINES "")
+file(GENERATE
+  OUTPUT "${CMAKE_BINARY_DIR}/cmake/panda3d.csharpmods"
+  CONTENT "$<JOIN:$<TARGET_PROPERTY:p3csharp_modmap,CSHARP_MODMAP_LINES>,\n>\n")
+
 # Internal: invoke interrogate_csharp (pass 2) to emit .cs files for one module.
 function(_interrogate_csharp_pass2 module stamp dllname module_databases)
   get_filename_component(stamp_directory "${stamp}" DIRECTORY)
@@ -409,9 +423,13 @@ function(add_csharp_module module)
   if(import_modules)
     foreach(_import ${import_modules})
       set_property(GLOBAL APPEND PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS "${module}=${_import}")
+      set_property(TARGET p3csharp_modmap APPEND PROPERTY
+        CSHARP_MODMAP_LINES "depends ${module} ${_import}")
     endforeach()
   else()
     set_property(GLOBAL APPEND PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS "${module}=")
+    set_property(TARGET p3csharp_modmap APPEND PROPERTY
+      CSHARP_MODMAP_LINES "depends ${module}")
   endif()
 
   # Derive the library name for [LibraryImport] from the first metalib target.
@@ -462,6 +480,8 @@ function(add_csharp_module module)
 
     # Record library>module mapping
     set_property(GLOBAL APPEND PROPERTY INTERROGATE_LIB_MODULE_MAP "${target}=${module}")
+    set_property(TARGET p3csharp_modmap APPEND PROPERTY
+      CSHARP_MODMAP_LINES "map ${target} ${module}")
   endforeach()
 
   # Run interrogate_csharp (pass 2) to generate .cs files
