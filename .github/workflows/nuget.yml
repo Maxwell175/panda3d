@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.crt || 'default' }}-v3-mimalloc343-${{ matrix.os }}
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.crt || 'default' }}-v4-mimalloc343-recast-${{ matrix.os }}
 
       - name: Install yasm
         if: runner.os != 'Windows' && steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
@@ -61,6 +61,17 @@ jobs:
           grep -q "GIT_TAG ${NEW}" thirdparty/CMakeLists.txt || { echo "::error::mimalloc tag not bumped — the thirdparty pin may have changed"; exit 1; }
           grep -n -A1 'mimalloc.git' thirdparty/CMakeLists.txt
 
+      # recastnavigation 1.6.0 still declares cmake_minimum_required(VERSION 2.8),
+      # which CMake 4.x refuses.  Ask its sub-build to apply 3.5 policies.
+      - name: Allow pre-3.5 policies for recast
+        if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          sed -i.bak 's|^\( *\)-DRECASTNAVIGATION_DEMO=OFF|\1-DCMAKE_POLICY_VERSION_MINIMUM=3.5\n\1-DRECASTNAVIGATION_DEMO=OFF|' thirdparty/CMakeLists.txt
+          rm -f thirdparty/CMakeLists.txt.bak
+          grep -q 'CMAKE_POLICY_VERSION_MINIMUM=3.5' thirdparty/CMakeLists.txt || { echo "::error::recast policy flag not injected — the thirdparty recast block may have changed"; exit 1; }
+          grep -n -B4 -A4 'CMAKE_POLICY_VERSION_MINIMUM' thirdparty/CMakeLists.txt
+
       - name: Configure
         if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
         working-directory: thirdparty
@@ -70,6 +81,7 @@ jobs:
           -DBUILD_FFMPEG=OFF
           -DBUILD_FCOLLADA=OFF
           -DBUILD_ARTOOLKIT=OFF
+          -DBUILD_RECAST=ON
 
       - name: Build
         if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
@@ -126,7 +138,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.thirdparty_crt || 'default' }}-v3-mimalloc343-${{ matrix.os }}
+          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.thirdparty_crt || 'default' }}-v4-mimalloc343-recast-${{ matrix.os }}
           fail-on-cache-miss: true
 
       - name: Install build tools (Linux)
