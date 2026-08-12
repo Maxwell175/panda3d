@@ -121,6 +121,10 @@ if(INTERROGATE_CSHARP_INTERFACE)
   add_csharp_module(panda3d.fx pandafx IMPORT panda3d.core)
   add_csharp_module(panda3d.physics p3physics p3particlesystem LINK pandaphysics IMPORT panda3d.core)
 
+  if(HAVE_RECAST AND HAVE_DETOUR)
+    add_csharp_module(panda3d.navigation p3navigation IMPORT panda3d.core)
+  endif()
+
   if(HAVE_ODE)
     add_csharp_module(panda3d.ode p3ode IMPORT panda3d.core)
   endif()
