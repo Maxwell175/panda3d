@@ -28,19 +28,27 @@ if(DETOUR_INCLUDE_DIR)
           INTERFACE_INCLUDE_DIRECTORIES "${DETOUR_INCLUDE_DIR}"
           IMPORTED_LOCATION "${DETOUR_LIBRARY}")
 
+  # DetourTileCache and DetourCrowd both call into Detour itself -- dtTileCache
+  # reaches dtCreateNavMeshData, for one.  Declare that so the link line puts
+  # Detour after them: these are static archives, and a member is only pulled in
+  # to satisfy a symbol that is already undefined when the archive is scanned.
+  # Listed the other way round the link still succeeds, because a shared library
+  # may keep undefined symbols, and only fails when the navmesh is first built.
   add_library(Detour::DetourTile UNKNOWN IMPORTED GLOBAL)
 
   set_target_properties(Detour::DetourTile PROPERTIES
           INTERFACE_INCLUDE_DIRECTORIES "${DETOUR_INCLUDE_DIR}"
+          INTERFACE_LINK_LIBRARIES Detour::DetourMain
           IMPORTED_LOCATION "${DETOUR_TILE_LIBRARY}")
 
   add_library(Detour::DetourCrowd UNKNOWN IMPORTED GLOBAL)
 
   set_target_properties(Detour::DetourCrowd PROPERTIES
           INTERFACE_INCLUDE_DIRECTORIES "${DETOUR_INCLUDE_DIR}"
+          INTERFACE_LINK_LIBRARIES Detour::DetourMain
           IMPORTED_LOCATION "${DETOUR_CROWD_LIBRARY}")
 
   add_library(Detour::Detour INTERFACE IMPORTED)
   set_property(TARGET Detour::Detour PROPERTY
-      INTERFACE_LINK_LIBRARIES Detour::DetourMain Detour::DetourTile Detour::DetourCrowd)
+      INTERFACE_LINK_LIBRARIES Detour::DetourTile Detour::DetourCrowd Detour::DetourMain)
 endif()
