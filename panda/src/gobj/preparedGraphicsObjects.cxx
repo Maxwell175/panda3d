@@ -242,7 +242,13 @@ void PreparedGraphicsObjects::
 release_texture(TextureContext *tc) {
   ReMutexHolder holder(_lock);
 
-  tc->get_texture()->clear_prepared(this);
+  // Already released by another path, and holding nothing. See release_index_buffer() below for the
+  // full account -- this is the same shape, fixed by inspection rather than by its own crash.
+  Texture *tex = tc->get_texture();
+  if (tex == nullptr) {
+    return;
+  }
+  tex->clear_prepared(this);
 
   // We have to set the Texture pointer to NULL at this point, since the
   // Texture itself might destruct at any time after it has been released.
@@ -906,10 +912,15 @@ void PreparedGraphicsObjects::
 release_vertex_buffer(VertexBufferContext *vbc) {
   ReMutexHolder holder(_lock);
 
-  vbc->get_data()->clear_prepared(this);
+  // Same shape as release_index_buffer() below, fixed by inspection rather than by its own crash.
+  GeomVertexArrayData *data = vbc->get_data();
+  if (data == nullptr) {
+    return;
+  }
+  data->clear_prepared(this);
 
-  size_t data_size_bytes = vbc->get_data()->get_data_size_bytes();
-  GeomEnums::UsageHint usage_hint = vbc->get_data()->get_usage_hint();
+  size_t data_size_bytes = data->get_data_size_bytes();
+  GeomEnums::UsageHint usage_hint = data->get_usage_hint();
 
   // We have to set the Data pointer to NULL at this point, since the Data
   // itself might destruct at any time after it has been released.
@@ -1100,7 +1111,24 @@ void PreparedGraphicsObjects::
 release_index_buffer(IndexBufferContext *ibc) {
   ReMutexHolder holder(_lock);
 
-  ibc->get_data()->clear_prepared(this);
+  // **A context can be released twice, and the second one arrives holding nothing.** The back-pointer
+  // is raw by design (BufferContext::_object: "cannot be a PT()", or the object and the GSG would own
+  // each other), and every release path nulls it a dozen lines below -- for the reason that comment
+  // gives, that the data may destruct the moment it is released. Nothing checked it on entry.
+  //
+  // Two releases of one context is not exotic. GeomPrimitive::release_all() copies its context map and
+  // releases each entry with no lock held, precisely so it cannot deadlock against this object's lock;
+  // between the copy and the call, a GSG sweeping its own prepared objects can release the same context
+  // and null the pointer. The dying object then dereferences null.
+  //
+  // Measured rather than argued: rdi was 0x0 and the fault address 0xc0, the offset of _contexts, with
+  // ~GeomTristrips -> ~GeomPrimitive -> release_all -> here on the stack. It cost about one crash in
+  // twelve with a garbage collector destroying drawn geometry off the frame.
+  GeomPrimitive *data = ibc->get_data();
+  if (data == nullptr) {
+    return;
+  }
+  data->clear_prepared(this);
 
   // A primitive prepared while indexed can be non-indexed by the time it is released:
   // set_nonindexed_vertices() and clear_vertices() null the index array without releasing the
@@ -1111,10 +1139,10 @@ release_index_buffer(IndexBufferContext *ibc) {
   // Seen as a repeating "!cdata->_vertices.is_null()" from EpochManager::try_reclaim(), which is where
   // a retired Geom::CData destroys its primitives; a frame-rate meter regenerating its text every
   // update is enough to make it constant.
-  size_t data_size_bytes = ibc->get_data()->is_indexed()
-    ? (size_t)ibc->get_data()->get_data_size_bytes()
+  size_t data_size_bytes = data->is_indexed()
+    ? (size_t)data->get_data_size_bytes()
     : 0;
-  GeomEnums::UsageHint usage_hint = ibc->get_data()->get_usage_hint();
+  GeomEnums::UsageHint usage_hint = data->get_usage_hint();
 
   // We have to set the Data pointer to NULL at this point, since the Data
   // itself might destruct at any time after it has been released.
