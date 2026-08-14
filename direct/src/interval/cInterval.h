@@ -22,6 +22,7 @@
 #include "extension.h"
 
 class CIntervalManager;
+class ReMutex;
 
 /**
  * The base class for timeline components.  A CInterval represents a single
@@ -142,6 +143,8 @@ public:
 
 protected:
   void interval_done();
+
+  ReMutex &get_lock() const;
 
   INLINE void recompute() const;
   virtual void do_recompute();

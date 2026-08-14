@@ -20,7 +20,7 @@
 #include "pvector.h"
 #include "pmap.h"
 #include "vector_int.h"
-#include "pmutex.h"
+#include "reMutex.h"
 
 class EventQueue;
 
@@ -88,9 +88,14 @@ private:
   int _first_slot;
   int _next_event_index;
 
-  Mutex _lock;
+  // Reentrant so that CInterval can hold it across the calls it makes back into this class:
+  // start() takes it and then calls add_c_interval(), which takes it again.
+  ReMutex _lock;
 
   static CIntervalManager *_global_ptr;
+
+  // For CInterval::get_lock(), so an interval's play-control methods are atomic against step().
+  friend class CInterval;
 };
 
 INLINE std::ostream &operator << (std::ostream &out, const CInterval &ival_mgr);

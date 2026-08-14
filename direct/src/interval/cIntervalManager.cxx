@@ -15,7 +15,7 @@
 #include "cMetaInterval.h"
 #include "dcast.h"
 #include "eventQueue.h"
-#include "mutexHolder.h"
+#include "reMutexHolder.h"
 
 CIntervalManager *CIntervalManager::_global_ptr;
 
@@ -52,7 +52,7 @@ CIntervalManager::
  */
 int CIntervalManager::
 add_c_interval(CInterval *interval, bool external) {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   // First, check the name index.  If we already have an interval by this
   // name, it gets finished and removed.
@@ -109,7 +109,7 @@ add_c_interval(CInterval *interval, bool external) {
  */
 int CIntervalManager::
 find_c_interval(const std::string &name) const {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   NameIndex::const_iterator ni = _name_index.find(name);
   if (ni != _name_index.end()) {
@@ -123,7 +123,7 @@ find_c_interval(const std::string &name) const {
  */
 CInterval *CIntervalManager::
 get_c_interval(int index) const {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   nassertr(index >= 0 && index < (int)_intervals.size(), nullptr);
   return _intervals[index]._interval;
@@ -136,7 +136,7 @@ get_c_interval(int index) const {
  */
 void CIntervalManager::
 remove_c_interval(int index) {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   nassertv(index >= 0 && index < (int)_intervals.size());
   IntervalDef &def = _intervals[index];
@@ -162,7 +162,7 @@ remove_c_interval(int index) {
  */
 int CIntervalManager::
 interrupt() {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   int num_paused = 0;
 
@@ -225,7 +225,7 @@ interrupt() {
  */
 int CIntervalManager::
 get_num_intervals() const {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   return _name_index.size();
 }
@@ -238,7 +238,7 @@ get_num_intervals() const {
  */
 int CIntervalManager::
 get_max_index() const {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   return _intervals.size();
 }
@@ -255,7 +255,7 @@ get_max_index() const {
  */
 void CIntervalManager::
 step() {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   NameIndex::iterator ni;
   ni = _name_index.begin();
@@ -295,7 +295,7 @@ step() {
  */
 int CIntervalManager::
 get_next_event() {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   while (_next_event_index < (int)_intervals.size()) {
     IntervalDef &def = _intervals[_next_event_index];
@@ -330,7 +330,7 @@ get_next_event() {
  */
 int CIntervalManager::
 get_next_removal() {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   if (!_removed.empty()) {
     int index = _removed.back();
@@ -352,7 +352,7 @@ get_next_removal() {
  */
 void CIntervalManager::
 output(std::ostream &out) const {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   out << "CIntervalManager, " << (int)_name_index.size() << " intervals.";
 }
@@ -362,7 +362,7 @@ output(std::ostream &out) const {
  */
 void CIntervalManager::
 write(std::ostream &out) const {
-  MutexHolder holder(_lock);
+  ReMutexHolder holder(_lock);
 
   // We need to write this line so that it's clear what's going on when there
   // are no intervals in the list.

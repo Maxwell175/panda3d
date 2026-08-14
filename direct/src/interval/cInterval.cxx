@@ -18,6 +18,7 @@
 #include "event.h"
 #include "eventQueue.h"
 #include "pStatTimer.h"
+#include "reMutexHolder.h"
 
 using std::ostream;
 using std::string;
@@ -88,6 +89,7 @@ CInterval::
  */
 void CInterval::
 set_t(double t) {
+  ReMutexHolder holder(get_lock());
   // There doesn't seem to be any reason to clamp this, and it breaks looping
   // intervals.  The interval code should properly handle t values outside the
   // proper range.  t = min(max(t, 0.0), get_duration());
@@ -139,6 +141,7 @@ set_t(double t) {
  */
 void CInterval::
 start(double start_t, double end_t, double play_rate) {
+  ReMutexHolder holder(get_lock());
   setup_play(start_t, end_t, play_rate, false);
   _manager->add_c_interval(this, false);
 }
@@ -152,6 +155,7 @@ start(double start_t, double end_t, double play_rate) {
  */
 void CInterval::
 loop(double start_t, double end_t, double play_rate) {
+  ReMutexHolder holder(get_lock());
   setup_play(start_t, end_t, play_rate, true);
   _manager->add_c_interval(this, false);
 }
@@ -162,6 +166,7 @@ loop(double start_t, double end_t, double play_rate) {
  */
 double CInterval::
 pause() {
+  ReMutexHolder holder(get_lock());
   if (get_state() == S_started) {
     priv_interrupt();
   }
@@ -178,6 +183,7 @@ pause() {
  */
 void CInterval::
 resume() {
+  ReMutexHolder holder(get_lock());
   setup_resume();
   _manager->add_c_interval(this, false);
 }
@@ -188,6 +194,7 @@ resume() {
  */
 void CInterval::
 resume(double start_t) {
+  ReMutexHolder holder(get_lock());
   set_t(start_t);
   setup_resume();
   _manager->add_c_interval(this, false);
@@ -200,6 +207,7 @@ resume(double start_t) {
  */
 void CInterval::
 resume_until(double end_t) {
+  ReMutexHolder holder(get_lock());
   setup_resume_until(end_t);
   _manager->add_c_interval(this, false);
 }
@@ -209,6 +217,7 @@ resume_until(double end_t) {
  */
 void CInterval::
 finish() {
+  ReMutexHolder holder(get_lock());
   switch (get_state()) {
   case S_initial:
     priv_instant();
@@ -235,6 +244,7 @@ finish() {
  */
 void CInterval::
 clear_to_initial() {
+  ReMutexHolder holder(get_lock());
   pause();
 
   _state = S_initial;
@@ -246,6 +256,7 @@ clear_to_initial() {
  */
 bool CInterval::
 is_playing() const {
+  ReMutexHolder holder(get_lock());
   int index = _manager->find_c_interval(this->get_name());
   return (index >= 0);
 }
@@ -267,6 +278,7 @@ get_play_rate() const {
  */
 void CInterval::
 set_play_rate(double play_rate) {
+  ReMutexHolder holder(get_lock());
   if (is_playing()) {
     pause();
     _play_rate = play_rate;
@@ -668,6 +680,20 @@ interval_done() {
   if (!_done_event.empty()) {
     _manager->get_event_queue()->queue_event(new Event(_done_event));
   }
+}
+
+/**
+ * Returns the lock of the manager this interval is registered with.  Each of the play-control
+ * methods holds it for the length of its body, so that it is atomic against step().
+ *
+ * The priv_*() methods and step_play() deliberately do not hold it: they are called by step(),
+ * which is holding it already, and by a CMetaInterval driving its children.
+ */
+ReMutex &CInterval::
+get_lock() const {
+  // set_manager() is published, so this can be null.
+  CIntervalManager *manager = (_manager != nullptr) ? _manager : CIntervalManager::get_global_ptr();
+  return manager->_lock;
 }
 
 /**
