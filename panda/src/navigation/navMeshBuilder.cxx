@@ -170,13 +170,13 @@ NavMeshBuilder::~NavMeshBuilder() {
  * This function adds a custom polygon with three vertices to the input geometry.
  */
 void NavMeshBuilder::add_polygon(LPoint3 a, LPoint3 b, LPoint3 c) {
-  mat_to_y.xform_point_in_place(a);
+  nav_to_recast_mat().xform_point_in_place(a);
   update_bounds(a);
 
-  mat_to_y.xform_point_in_place(b);
+  nav_to_recast_mat().xform_point_in_place(b);
   update_bounds(b);
 
-  mat_to_y.xform_point_in_place(c);
+  nav_to_recast_mat().xform_point_in_place(c);
   update_bounds(c);
 
   _untracked_tris.insert(NavTriVertGroup(a, b, c));
@@ -289,7 +289,7 @@ void NavMeshBuilder::process_primitive(std::set<NavTriVertGroup> &tris, const Ge
  */
 void NavMeshBuilder::process_geom(std::set<NavTriVertGroup> &tris, CPT(Geom) &geom, const CPT(TransformState) &transform) {
   // Chain in the matrix to convert to y-up here.
-  LMatrix4 transform_mat = transform->get_mat() * mat_to_y;
+  LMatrix4 transform_mat = transform->get_mat() * nav_to_recast_mat();
 
   CPT(GeomVertexData) vdata = geom->get_vertex_data();
 
@@ -827,7 +827,7 @@ process_obstacle_node_path(dtTileCache *tile_cache, std::set<ObstacleData> &exis
 
   if (node.node()->is_of_type(NavObstacleNode::get_class_type())) {
     PT(NavObstacleNode) g = DCAST(NavObstacleNode, node.node());
-    auto mat = transform->get_mat() * mat_to_y;
+    auto mat = transform->get_mat() * nav_to_recast_mat();
     auto obs_data = g->get_obstacle_data(mat);
     new_obstacles.emplace(obs_data);
     if (existing_obstacles.find(obs_data) == existing_obstacles.end()) {

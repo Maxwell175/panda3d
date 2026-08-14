@@ -53,10 +53,11 @@ LPoint3 NavMeshQuery::nearest_point(LPoint3 p, LVector3 extents) {
     return LPoint3();
   }
 
-  LPoint3 center_pt = mat_to_y.xform_point(p);
+  LPoint3 center_pt = nav_to_recast_mat().xform_point(p);
   const float center[3] = { center_pt[0], center_pt[1], center_pt[2] };  // convert to y-up system
   float nearest_p[3] = { 0, 0, 0 };
-  LVector3 transformed_extents = mat_to_y.xform_point(extents);
+  // Half-extents are a direction, so xform_vec; the axes may be permuted and negated, hence abs().
+  LVector3 transformed_extents = nav_to_recast_mat().xform_vec(extents);
   const float extent_array[3] = { std::abs(transformed_extents[0]), std::abs(transformed_extents[1]), std::abs(transformed_extents[2]) };
 
   dtQueryFilter filter;
@@ -69,7 +70,7 @@ LPoint3 NavMeshQuery::nearest_point(LPoint3 p, LVector3 extents) {
     navigation_cat.error() << "Cannot find nearest point on polymesh." << std::endl;
     return LPoint3();
   }
-  return mat_from_y.xform_point({ nearest_p[0], nearest_p[1], nearest_p[2] }); // convert back from y-up system
+  return nav_from_recast_mat().xform_point({ nearest_p[0], nearest_p[1], nearest_p[2] }); // convert back from y-up system
 }
 
 /**
@@ -82,16 +83,17 @@ NavMeshPath NavMeshQuery::find_path(LPoint3 &start, LPoint3 &end, LVector3 exten
 
   dtPolyRef start_ref = 0;
   dtPolyRef end_ref = 0;
-  LPoint3 start_pos_pt = mat_to_y.xform_point(start);
+  LPoint3 start_pos_pt = nav_to_recast_mat().xform_point(start);
   const float start_pos[3] = { start_pos_pt[0], start_pos_pt[1], start_pos_pt[2] }; // convert to y-up system
   float nearest_start[3] = { 0, 0, 0 };
-  LPoint3 end_pos_pt = mat_to_y.xform_point(end);
+  LPoint3 end_pos_pt = nav_to_recast_mat().xform_point(end);
   const float end_pos[3] = { end_pos_pt[0], end_pos_pt[1], end_pos_pt[2] }; // convert to y-up system
   float nearest_end[3] = { 0, 0, 0 };
   dtQueryFilter *filter = _filter.get_filter();
   dtPolyRef path[MAX_POLYS];
   int path_count;
-  LVector3 transformed_extents = mat_to_y.xform_point(extents);
+  // Half-extents are a direction, so xform_vec; the axes may be permuted and negated, hence abs().
+  LVector3 transformed_extents = nav_to_recast_mat().xform_vec(extents);
   const float extent_array[3] = { fabs(transformed_extents[0]), fabs(transformed_extents[1]), fabs(transformed_extents[2]) };
 
   dtStatus status = _nav_query->findNearestPoly(start_pos, extent_array, filter, &start_ref, nearest_start);
@@ -128,7 +130,7 @@ NavMeshPath NavMeshQuery::find_path(LPoint3 &start, LPoint3 &end, LVector3 exten
     pos[0] = closest[0];
     pos[1] = closest[1];
     pos[2] = closest[2];
-    LPoint3 point = mat_from_y.xform_point({ closest[0], closest[1], closest[2] }); // convert back from y-up system
+    LPoint3 point = nav_from_recast_mat().xform_point({ closest[0], closest[1], closest[2] }); // convert back from y-up system
     path_array.push_back(point);
   }
 
@@ -148,16 +150,17 @@ NavMeshPath NavMeshQuery::find_straight_path(LPoint3 &start, LPoint3 &end, LVect
 
   dtPolyRef start_ref = 0;
   dtPolyRef end_ref = 0;
-  LPoint3 start_pos_pt = mat_to_y.xform_point(start);
+  LPoint3 start_pos_pt = nav_to_recast_mat().xform_point(start);
   const float start_pos[3] = { start_pos_pt[0], start_pos_pt[1], start_pos_pt[2] }; // convert to y-up system
   float nearest_start[3] = { 0, 0, 0 };
-  LPoint3 end_pos_pt = mat_to_y.xform_point(end);
+  LPoint3 end_pos_pt = nav_to_recast_mat().xform_point(end);
   const float end_pos[3] = { end_pos_pt[0], end_pos_pt[1], end_pos_pt[2] }; // convert to y-up system
   float nearest_end[3] = { 0, 0, 0 };
   dtQueryFilter *filter = _filter.get_filter();
   dtPolyRef path[MAX_POLYS];
   int path_count;
-  LVector3 transformed_extents = mat_to_y.xform_point(extents);
+  // Half-extents are a direction, so xform_vec; the axes may be permuted and negated, hence abs().
+  LVector3 transformed_extents = nav_to_recast_mat().xform_vec(extents);
   const float extent_array[3] = { fabs(transformed_extents[0]), fabs(transformed_extents[1]), fabs(transformed_extents[2]) };
 
   dtStatus status = _nav_query->findNearestPoly(start_pos, extent_array, filter, &start_ref, nearest_start);
@@ -190,7 +193,7 @@ NavMeshPath NavMeshQuery::find_straight_path(LPoint3 &start, LPoint3 &end, LVect
   }
 
   for (int i=0;i<straight_path_count*3;i+=3) {
-    LPoint3 point = mat_from_y.xform_point({ straight_path[i], straight_path[i+1], straight_path[i+2] });  // convert back from y-up system
+    LPoint3 point = nav_from_recast_mat().xform_point({ straight_path[i], straight_path[i+1], straight_path[i+2] });  // convert back from y-up system
     straight_path_array.push_back(point);
   }
 
@@ -366,15 +369,16 @@ NavMeshPath NavMeshQuery::find_smooth_path(LPoint3 &start, LPoint3 &end, LVector
 
   dtPolyRef start_ref = 0;
   dtPolyRef end_ref = 0;
-  LPoint3 start_pos_pt = mat_to_y.xform_point(start);
+  LPoint3 start_pos_pt = nav_to_recast_mat().xform_point(start);
   const float start_pos[3] = { start_pos_pt[0], start_pos_pt[1], start_pos_pt[2] }; // convert to y-up system
   float nearest_start[3] = { 0, 0, 0 };
-  LPoint3 end_pos_pt = mat_to_y.xform_point(end);
+  LPoint3 end_pos_pt = nav_to_recast_mat().xform_point(end);
   const float end_pos[3] = { end_pos_pt[0], end_pos_pt[1], end_pos_pt[2] }; // convert to y-up system
   float nearest_end[3] = { 0, 0, 0 };
   dtPolyRef path[MAX_POLYS];
   int path_count;
-  LVector3 transformed_extents = mat_to_y.xform_point(extents);
+  // Half-extents are a direction, so xform_vec; the axes may be permuted and negated, hence abs().
+  LVector3 transformed_extents = nav_to_recast_mat().xform_vec(extents);
   const float extent_array[3] = { fabs(transformed_extents[0]), fabs(transformed_extents[1]), fabs(transformed_extents[2]) };
 
   dtStatus status = _nav_query->findNearestPoly(start_pos, extent_array, _filter.get_filter(), &start_ref, nearest_start);
@@ -517,7 +521,7 @@ NavMeshPath NavMeshQuery::find_smooth_path(LPoint3 &start, LPoint3 &end, LVector
   }
 
   for (size_t i = 0; i < smooth_path.size(); i += 3) {
-    LPoint3 point = mat_from_y.xform_point({ smooth_path[i], smooth_path[i + 1], smooth_path[i + 2] }); // convert back from y-up system
+    LPoint3 point = nav_from_recast_mat().xform_point({ smooth_path[i], smooth_path[i + 1], smooth_path[i + 2] }); // convert back from y-up system
     path_array.push_back(point);
   }
 

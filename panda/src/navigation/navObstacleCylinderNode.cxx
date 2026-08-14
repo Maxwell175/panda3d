@@ -12,6 +12,7 @@
  */
 
 #include "navObstacleCylinderNode.h"
+#include "config_navigation.h"
 #include "geomTriangles.h"
 
 TypeHandle NavObstacleCylinderNode::_type_handle;
@@ -32,8 +33,9 @@ get_obstacle_data(const LMatrix4 &transform) {
   transform.xform_point_in_place(radius_height_transformed);
   // Counteract the translation
   LVector3 radius_height = radius_height_transformed - transform.get_row3(3);
-  // Undo the yup conversion that is baked into the incoming mat.
-  LMatrix4::convert_mat(CS_yup_right, CS_zup_right).xform_point_in_place(radius_height);
+  // Undo the y-up conversion baked into the incoming mat, against the same coordinate system the
+  // builder applied it with.
+  nav_from_recast_mat().xform_vec_in_place(radius_height);
   return {DT_OBSTACLE_CYLINDER, pos, LPoint3(), std::min(std::abs(radius_height[0]), std::abs(radius_height[1])), std::abs(radius_height[2])};
 }
 
@@ -47,8 +49,9 @@ add_obstacle(dtTileCache *tileCache, const LMatrix4 &transform) {
   transform.xform_point_in_place(radius_height_transformed);
   // Counteract the translation
   LVector3 radius_height = radius_height_transformed - transform.get_row3(3);
-  // Undo the yup conversion that is baked into the incoming mat.
-  LMatrix4::convert_mat(CS_yup_right, CS_zup_right).xform_point_in_place(radius_height);
+  // Undo the y-up conversion baked into the incoming mat, against the same coordinate system the
+  // builder applied it with.
+  nav_from_recast_mat().xform_vec_in_place(radius_height);
 	tileCache->addObstacle(reinterpret_cast<const float *>(&posArr), std::min(std::abs(radius_height[0]), std::abs(radius_height[1])), std::abs(radius_height[2]), nullptr);
 }
 

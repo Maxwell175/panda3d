@@ -55,8 +55,6 @@ private:
   PT(NavMesh) _navMesh;
   dtPolyRef _polyRef;
 
-  LMatrix4 mat_from_y = LMatrix4::convert_mat(CS_yup_right, CS_default);
-  LMatrix4 mat_to_y = LMatrix4::convert_mat(CS_default, CS_yup_right);
 };
 
 typedef pvector<NavMeshPoly> NavMeshPolys;

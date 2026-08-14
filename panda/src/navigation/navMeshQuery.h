@@ -47,8 +47,6 @@ private:
   static const int MAX_POLYS = 256;
   NavMeshQueryFilter _filter;
 
-  LMatrix4 mat_from_y = LMatrix4::convert_mat(CS_yup_right, CS_default);
-  LMatrix4 mat_to_y = LMatrix4::convert_mat(CS_default, CS_yup_right);
 
 public:
   

@@ -101,8 +101,6 @@ private:
   PT(GeomNode) _cache_poly_outlines = nullptr;
   std::unordered_map<dtPolyRef, PointList> _cache_poly_verts;
 
-  LMatrix4 mat_from_y = LMatrix4::convert_mat(CS_yup_right, CS_default);
-  LMatrix4 mat_to_y = LMatrix4::convert_mat(CS_default, CS_yup_right);
 
   dtTileCache *_tile_cache;
   dtTileCacheAlloc *_tile_alloc;

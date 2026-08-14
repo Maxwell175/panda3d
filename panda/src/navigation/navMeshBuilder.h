@@ -111,8 +111,6 @@ private:
 
   INLINE static void get_vert_tris(const std::set<NavTriVertGroup> &tri_vert_groups, pvector<float> &verts, pvector<int> &tris);
 
-  LMatrix4 mat_from_y = LMatrix4::convert_mat(CS_yup_right, CS_default);
-  LMatrix4 mat_to_y = LMatrix4::convert_mat(CS_default, CS_yup_right);
 
 protected:
   bool _bounds_set = false;

@@ -51,7 +51,6 @@ PUBLISHED:
   INLINE int get_max_layers_per_tile() const;
   INLINE float get_detail_sample_dist() const;
   INLINE float get_detail_sample_max_error() const;
-  INLINE LPoint3 get_orig_bound_min() const;
   INLINE float get_tile_cell_size() const;
   INLINE bool get_filter_low_hanging_obstacles() const;
   INLINE bool get_filter_ledge_spans() const;
@@ -73,7 +72,6 @@ PUBLISHED:
   INLINE void set_max_layers_per_tile(int nlayers);
   INLINE void set_detail_sample_dist(float detail_sample_dist);
   INLINE void set_detail_sample_max_error(float detail_sample_max_error);
-  INLINE void set_orig_bound_min(LPoint3 orig);
   INLINE void set_filter_low_hanging_obstacles(bool filter_low_hanging_obstacles);
   INLINE void set_filter_ledge_spans(bool filter_ledge_spans);
   INLINE void set_filter_walkable_low_height_spans(bool filter_walkable_low_height_spans);
@@ -96,7 +94,6 @@ PUBLISHED:
   MAKE_PROPERTY(max_polys_per_tile, get_max_polys_per_tile);
   MAKE_PROPERTY(detail_sample_dist, get_detail_sample_dist, set_detail_sample_dist);
   MAKE_PROPERTY(detail_sample_max_error, get_detail_sample_max_error, set_detail_sample_max_error);
-  MAKE_PROPERTY(orig_bound_min, get_orig_bound_min, set_orig_bound_min);
   MAKE_PROPERTY(tile_cell_size, get_tile_cell_size);
   MAKE_PROPERTY(filter_low_hanging_obstacles, get_filter_low_hanging_obstacles, set_filter_low_hanging_obstacles);
   MAKE_PROPERTY(filter_ledge_spans, get_filter_ledge_spans, set_filter_ledge_spans);
@@ -105,6 +102,14 @@ PUBLISHED:
   INLINE void reset();
 
   INLINE bool operator==(const NavMeshParams &other) const;
+
+public:
+  /**
+   * The origin the tile grid is laid out from, in y-up space.  Not PUBLISHED: it is written by the
+   * builder rather than set, and it is the only value here in a space the rest of the API does not use.
+   */
+  INLINE LPoint3 get_orig_bound_min() const;
+  INLINE void set_orig_bound_min(LPoint3 orig);
 
 protected:
   float actor_height;

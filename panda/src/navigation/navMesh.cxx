@@ -208,7 +208,7 @@ get_poly_at(LPoint3 point) {
 
   query.init(_nav_mesh, 8);
 
-  LPoint3 center_pt = mat_to_y.xform_point(point);
+  LPoint3 center_pt = nav_to_recast_mat().xform_point(point);
   const float center[3] = { center_pt[0], center_pt[1], center_pt[2] };  // convert to y-up system
   float nearest_p[3] = { 0, 0, 0 };
   const float extents[3] = { 10 , 10 , 10 };
@@ -238,10 +238,11 @@ get_polys_around(LPoint3 point, LVector3 extents) {
 
   query.init(_nav_mesh, 8);
 
-  LPoint3 center_pt = mat_to_y.xform_point(point);
+  LPoint3 center_pt = nav_to_recast_mat().xform_point(point);
   const float center[3] = { center_pt[0], center_pt[1], center_pt[2] };  // convert to y-up system
 
-  LVector3 transformed_extents = mat_to_y.xform_point(extents);
+  // Half-extents are a direction, so xform_vec; the axes may be permuted and negated, hence abs().
+  LVector3 transformed_extents = nav_to_recast_mat().xform_vec(extents);
   const float extent_array[3] = { fabs(transformed_extents[0]), fabs(transformed_extents[1]), fabs(transformed_extents[2]) };
 
   dtQueryFilter filter;

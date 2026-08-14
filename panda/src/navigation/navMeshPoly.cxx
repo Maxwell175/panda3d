@@ -13,6 +13,7 @@
 
 #include "navMeshPoly.h"
 #include "navMesh.h"
+#include "config_navigation.h"
 
 
 /**
@@ -69,7 +70,7 @@ get_center() const {
     x /= poly->vertCount;
     y /= poly->vertCount;
     z /= poly->vertCount;
-    return mat_from_y.xform_point({ x, y, z }); // convert back from y-up system
+    return nav_from_recast_mat().xform_point({ x, y, z }); // convert back from y-up system
   } else {
     return {0, 0, 0};
   }
@@ -89,7 +90,7 @@ get_verts() const {
       float x = tile->verts[poly->verts[i] * 3];
       float y = tile->verts[poly->verts[i] * 3 + 1];
       float z = tile->verts[poly->verts[i] * 3 + 2];
-      result.emplace_back(mat_from_y.xform_point({ x, y, z }));
+      result.emplace_back(nav_from_recast_mat().xform_point({ x, y, z }));
     }
   }
 
