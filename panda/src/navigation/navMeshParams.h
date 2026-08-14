@@ -73,6 +73,7 @@ PUBLISHED:
   INLINE void set_max_layers_per_tile(int nlayers);
   INLINE void set_detail_sample_dist(float detail_sample_dist);
   INLINE void set_detail_sample_max_error(float detail_sample_max_error);
+  INLINE void set_orig_bound_min(LPoint3 orig);
   INLINE void set_filter_low_hanging_obstacles(bool filter_low_hanging_obstacles);
   INLINE void set_filter_ledge_spans(bool filter_ledge_spans);
   INLINE void set_filter_walkable_low_height_spans(bool filter_walkable_low_height_spans);
@@ -95,7 +96,7 @@ PUBLISHED:
   MAKE_PROPERTY(max_polys_per_tile, get_max_polys_per_tile);
   MAKE_PROPERTY(detail_sample_dist, get_detail_sample_dist, set_detail_sample_dist);
   MAKE_PROPERTY(detail_sample_max_error, get_detail_sample_max_error, set_detail_sample_max_error);
-  MAKE_PROPERTY(orig_bound_min, get_orig_bound_min);
+  MAKE_PROPERTY(orig_bound_min, get_orig_bound_min, set_orig_bound_min);
   MAKE_PROPERTY(tile_cell_size, get_tile_cell_size);
   MAKE_PROPERTY(filter_low_hanging_obstacles, get_filter_low_hanging_obstacles, set_filter_low_hanging_obstacles);
   MAKE_PROPERTY(filter_ledge_spans, get_filter_ledge_spans, set_filter_ledge_spans);

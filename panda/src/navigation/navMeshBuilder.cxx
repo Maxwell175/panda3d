@@ -560,6 +560,10 @@ PT(NavMesh) NavMeshBuilder::build() {
   navigation_cat.info() << "BMIN: " << _mesh_bMin[0] << " " << _mesh_bMin[1] << std::endl;
   navigation_cat.info() << "BMAX: " << _mesh_bMax[0] << " " << _mesh_bMax[1] << std::endl;
 
+  // Record where the tile grid starts.  _mesh_bMin dies with this builder, but the mesh needs the
+  // same point later to serialise itself and to rebuild tiles under a moved obstacle.
+  _params.set_orig_bound_min(LPoint3(_mesh_bMin[0], _mesh_bMin[1], _mesh_bMin[2]));
+
   int gw = 0, gh = 0;
   rcCalcGridSize(_mesh_bMin, _mesh_bMax, _params.get_cell_size(), &gw, &gh);
   const int ts = (int)_params.get_tile_size();

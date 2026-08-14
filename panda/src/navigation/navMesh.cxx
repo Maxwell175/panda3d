@@ -397,6 +397,14 @@ write_datagram(BamWriter *manager, Datagram &dg) {
   dg.add_bool(_params.get_filter_ledge_spans());
   dg.add_bool(_params.get_filter_walkable_low_height_spans());
 
+  // The origin places every tile below, and max_layers_per_tile sizes the cache they are read back
+  // into.  Without both, a mesh cannot be reconstructed where it was built.
+  LPoint3 orig = _params.get_orig_bound_min();
+  dg.add_float64(orig[0]);
+  dg.add_float64(orig[1]);
+  dg.add_float64(orig[2]);
+  dg.add_int32(_params.get_max_layers_per_tile());
+
   int num_tiles = 0;
 
   for (int i = 0; i < _tile_cache->getTileCount(); ++i)
@@ -486,6 +494,14 @@ fillin(DatagramIterator &scan, BamReader *manager) {
   _params.set_filter_low_hanging_obstacles(scan.get_bool());
   _params.set_filter_ledge_spans(scan.get_bool());
   _params.set_filter_walkable_low_height_spans(scan.get_bool());
+
+  // Both inits below depend on these.  One read per statement: argument evaluation order is
+  // unspecified, so reading three inside one constructor call could transpose the axes.
+  PN_stdfloat orig_x = scan.get_float64();
+  PN_stdfloat orig_y = scan.get_float64();
+  PN_stdfloat orig_z = scan.get_float64();
+  _params.set_orig_bound_min(LPoint3(orig_x, orig_y, orig_z));
+  _params.set_max_layers_per_tile(scan.get_int32());
 
   // Tile cache params.
   dtTileCacheParams tcparams = {};

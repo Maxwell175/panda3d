@@ -43,6 +43,12 @@ NavMeshParams(const NavMeshParams &other) {
   filter_low_hanging_obstacles = other.get_filter_low_hanging_obstacles();
   filter_ledge_spans = other.get_filter_ledge_spans();
   filter_walkable_low_height_spans = other.get_filter_walkable_low_height_spans();
+
+  // Travels with the rest: a NavMesh copies its params into its rebuilder, which indexes tiles from it.
+  LPoint3 orig = other.get_orig_bound_min();
+  orig_bound_min[0] = orig[0];
+  orig_bound_min[1] = orig[1];
+  orig_bound_min[2] = orig[2];
 }
 
 /**
@@ -374,6 +380,17 @@ get_orig_bound_min() const {
 }
 
 /**
+ * Sets the origin the tile grid is laid out from, in y-up space.  Written by NavMeshBuilder::build, not
+ * by the user.
+ */
+INLINE void NavMeshParams::
+set_orig_bound_min(LPoint3 orig) {
+  orig_bound_min[0] = orig[0];
+  orig_bound_min[1] = orig[1];
+  orig_bound_min[2] = orig[2];
+}
+
+/**
  * Returns the raw tile size.
  */
 INLINE float NavMeshParams::
@@ -450,6 +467,10 @@ reset() {
   filter_low_hanging_obstacles = true;
   filter_ledge_spans = true;
   filter_walkable_low_height_spans = true;
+
+  orig_bound_min[0] = 0.0f;
+  orig_bound_min[1] = 0.0f;
+  orig_bound_min[2] = 0.0f;
 }
 
 INLINE bool NavMeshParams::
@@ -473,7 +494,10 @@ operator==(const NavMeshParams &other) const {
       tile_size,
       filter_low_hanging_obstacles,
       filter_ledge_spans,
-      filter_walkable_low_height_spans
+      filter_walkable_low_height_spans,
+      orig_bound_min[0],
+      orig_bound_min[1],
+      orig_bound_min[2]
       ) ==
          std::make_tuple(
              other.get_cell_size(),
@@ -494,6 +518,9 @@ operator==(const NavMeshParams &other) const {
              other.get_tile_size(),
              other.get_filter_low_hanging_obstacles(),
              other.get_filter_ledge_spans(),
-             other.get_filter_walkable_low_height_spans()
+             other.get_filter_walkable_low_height_spans(),
+             other.get_orig_bound_min()[0],
+             other.get_orig_bound_min()[1],
+             other.get_orig_bound_min()[2]
              );
 }
