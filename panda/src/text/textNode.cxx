@@ -743,6 +743,24 @@ do_generate(CData *cdata) {
 }
 
 /**
+ * Puts a thread on pipeline stage 0 for as long as it is in scope.
+ */
+class PipelineStageOverride {
+public:
+  PipelineStageOverride(Thread *thread) :
+    _thread(thread), _pipeline_stage(thread->get_pipeline_stage()) {
+    _thread->set_pipeline_stage(0);
+  }
+  ~PipelineStageOverride() {
+    _thread->set_pipeline_stage(_pipeline_stage);
+  }
+
+private:
+  Thread *_thread;
+  int _pipeline_stage;
+};
+
+/**
  * Returns the actual node that is used internally to render the text, if the
  * TextNode is parented within the scene graph.
  */
@@ -759,6 +777,13 @@ do_get_internal_geom() const {
     // Propagate the generated text upstream if the upstream stages have no
     // changes to the text.
     CDWriter cdataw(((TextNode *)this)->_cycler, cdata, false);
+
+    // Assemble at stage 0, whichever stage we were called from.  The geometry
+    // is kept on the node, but TextAssembler writes its vertex data through the
+    // calling thread's pipeline stage, so assembling downstream leaves stage 0
+    // holding the empty array the GeomVertexData was created with, and the next
+    // Pipeline::cycle() copies that back down over the text.
+    PipelineStageOverride stage_0(Thread::get_current_thread());
     ((TextNode *)this)->do_rebuild(cdataw);
 
     return cdataw->_internal_geom;
