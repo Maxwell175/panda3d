@@ -33,15 +33,24 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.crt || 'default' }}-v4-mimalloc343-recast-${{ matrix.os }}
+          key: cache-thirdparty-c81136471ef455e376b372f424a6140f2be00c63-${{ matrix.crt || 'default' }}-v4-mimalloc343-recast-openal-${{ matrix.os }}
 
       - name: Install yasm
         if: runner.os != 'Windows' && steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
         run: ${{runner.os == 'macOS' && 'brew' || 'sudo apt-get'}} install yasm
 
+      # **OpenAL Soft compiles in the backends whose headers it can find, and says nothing about the
+      # rest.** Without these the Linux package went out with the WaveFile backend alone: it loads, it
+      # reports success, and it plays silence. The thirdparty now passes ALSOFT_REQUIRE_ALSA and
+      # ALSOFT_REQUIRE_PULSEAUDIO, so a runner missing these fails the build here rather than shipping
+      # a mute library.
+      - name: Install audio backend headers
+        if: runner.os == 'Linux' && steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libpulse-dev
+
       - name: Clone thirdparty repository
         if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true'
-        run: git clone --revision=73384217d26c56aa9594e6d77c9b7c54f9c0d689 --depth=1 https://github.com/rdb/panda3d-thirdparty.git thirdparty
+        run: git clone --revision=c81136471ef455e376b372f424a6140f2be00c63 --depth=1 https://github.com/Maxwell175/panda3d-thirdparty.git thirdparty
 
       - name: Patch thirdparty for MSVC /MT runtime
         if: steps.cache-thirdparty-restore.outputs.cache-hit != 'true' && matrix.crt == 'mt'
@@ -138,7 +147,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ./thirdparty
-          key: cache-thirdparty-73384217d26c56aa9594e6d77c9b7c54f9c0d689-${{ matrix.thirdparty_crt || 'default' }}-v4-mimalloc343-recast-${{ matrix.os }}
+          key: cache-thirdparty-c81136471ef455e376b372f424a6140f2be00c63-${{ matrix.thirdparty_crt || 'default' }}-v4-mimalloc343-recast-openal-${{ matrix.os }}
           fail-on-cache-miss: true
 
       - name: Install build tools (Linux)
