@@ -85,6 +85,14 @@
     <LinkerArg Include="-framework AudioUnit" />
     <LinkerArg Include="-framework AudioToolbox" />
     <LinkerArg Include="-framework CoreAudio" />
+    <!-- OpenAL's CoreAudio backend names ApplicationServices among its link libraries. Nothing in
+         the backend's source reaches into it on a modern SDK - AudioObjectGetPropertyData is
+         CoreAudio, AudioComponentFindNext is AudioToolbox, AudioUnitInitialize is AudioUnit, and all
+         three are above - but it is where the Component Manager used to live, it is an umbrella
+         framework present on every macOS, and matching what the library asks for costs nothing. A
+         static link has no second chance: the archive carries the requirement and this is the only
+         place left to satisfy it. -->
+    <LinkerArg Include="-framework ApplicationServices" />
     <LinkerArg Include="-lc++" />
   </ItemGroup>
 
