@@ -71,12 +71,21 @@ bool AsyncTask::
 remove() {
   AsyncTaskManager *manager = _manager;
   if (manager != nullptr) {
-    nassertr(_chain->_manager == manager, false);
     if (task_cat.is_debug()) {
       task_cat.debug()
         << "Removing " << *this << "\n";
     }
     MutexHolder holder(manager->_lock);
+
+    if (_chain == nullptr || _manager != manager) {
+      if (task_cat.is_debug()) {
+        task_cat.debug()
+          << "  (already removed " << *this << ")\n";
+      }
+      return false;
+    }
+    nassertr(_chain->_manager == manager, false);
+
     if (_chain->do_remove(this, true)) {
       return true;
     } else {
