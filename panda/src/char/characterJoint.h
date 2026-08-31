@@ -16,6 +16,7 @@
 
 #include "pandabase.h"
 #include "transformState.h"
+#include "lightMutex.h"
 
 #include "movingPartMatrix.h"
 #include "pandaNode.h"
@@ -81,6 +82,10 @@ private:
   typedef ov_set<PT(PandaNode), std::less<PT(PandaNode)>, small_vector<PT(PandaNode)> > NodeList;
   NodeList _net_transform_nodes;
   NodeList _local_transform_nodes;
+
+  // Guards the two lists above.  They are read by update_internals(), which runs on the cull thread
+  // via Character::cull_callback(), and written by add_net_transform() and friends from app.
+  LightMutex _transform_nodes_lock;
 
   typedef ov_set<JointVertexTransform *, std::less<JointVertexTransform *>, small_vector<JointVertexTransform *> > VertexTransforms;
   VertexTransforms _vertex_transforms;

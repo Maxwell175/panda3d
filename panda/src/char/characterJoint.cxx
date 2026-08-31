@@ -12,6 +12,7 @@
  */
 
 #include "characterJoint.h"
+#include "lightMutexHolder.h"
 #include "config_char.h"
 #include "jointVertexTransform.h"
 #include "characterJointEffect.h"
@@ -133,15 +134,18 @@ update_internals(PartBundle *root, PartGroup *parent, bool self_changed,
   }
 
   if (net_changed) {
-    if (!_net_transform_nodes.empty()) {
-      CPT(TransformState) t = TransformState::make_mat(_net_transform);
+    {
+      LightMutexHolder holder(_transform_nodes_lock);
+      if (!_net_transform_nodes.empty()) {
+        CPT(TransformState) t = TransformState::make_mat(_net_transform);
 
-      NodeList::iterator ai;
-      for (ai = _net_transform_nodes.begin();
-           ai != _net_transform_nodes.end();
-           ++ai) {
-        PandaNode *node = *ai;
-        node->set_transform(t, current_thread);
+        NodeList::iterator ai;
+        for (ai = _net_transform_nodes.begin();
+             ai != _net_transform_nodes.end();
+             ++ai) {
+          PandaNode *node = *ai;
+          node->set_transform(t, current_thread);
+        }
       }
     }
 
@@ -156,15 +160,18 @@ update_internals(PartBundle *root, PartGroup *parent, bool self_changed,
     }
   }
 
-  if (self_changed && !_local_transform_nodes.empty()) {
-    CPT(TransformState) t = TransformState::make_mat(_value);
+  if (self_changed) {
+    LightMutexHolder holder(_transform_nodes_lock);
+    if (!_local_transform_nodes.empty()) {
+      CPT(TransformState) t = TransformState::make_mat(_value);
 
-    NodeList::iterator ai;
-    for (ai = _local_transform_nodes.begin();
-         ai != _local_transform_nodes.end();
-         ++ai) {
-      PandaNode *node = *ai;
-      node->set_transform(t, current_thread);
+      NodeList::iterator ai;
+      for (ai = _local_transform_nodes.begin();
+           ai != _local_transform_nodes.end();
+           ++ai) {
+        PandaNode *node = *ai;
+        node->set_transform(t, current_thread);
+      }
     }
   }
 
@@ -199,6 +206,7 @@ add_net_transform(PandaNode *node) {
   }
   CPT(TransformState) t = TransformState::make_mat(_net_transform);
   node->set_transform(t, Thread::get_current_thread());
+  LightMutexHolder holder(_transform_nodes_lock);
   return _net_transform_nodes.insert(node).second;
 }
 
@@ -218,6 +226,7 @@ remove_net_transform(PandaNode *node) {
     node->clear_effect(CharacterJointEffect::get_class_type());
   }
 
+  LightMutexHolder holder(_transform_nodes_lock);
   return (_net_transform_nodes.erase(node) > 0);
 }
 
@@ -227,6 +236,7 @@ remove_net_transform(PandaNode *node) {
  */
 bool CharacterJoint::
 has_net_transform(PandaNode *node) const {
+  LightMutexHolder holder(_transform_nodes_lock);
   return (_net_transform_nodes.count(node) > 0);
 }
 
@@ -236,6 +246,7 @@ has_net_transform(PandaNode *node) const {
  */
 void CharacterJoint::
 clear_net_transforms() {
+  LightMutexHolder holder(_transform_nodes_lock);
   NodeList::iterator ai;
   for (ai = _net_transform_nodes.begin();
        ai != _net_transform_nodes.end();
@@ -291,6 +302,7 @@ add_local_transform(PandaNode *node) {
   }
   CPT(TransformState) t = TransformState::make_mat(_value);
   node->set_transform(t, Thread::get_current_thread());
+  LightMutexHolder holder(_transform_nodes_lock);
   return _local_transform_nodes.insert(node).second;
 }
 
@@ -310,6 +322,7 @@ remove_local_transform(PandaNode *node) {
     node->clear_effect(CharacterJointEffect::get_class_type());
   }
 
+  LightMutexHolder holder(_transform_nodes_lock);
   return (_local_transform_nodes.erase(node) > 0);
 }
 
@@ -319,6 +332,7 @@ remove_local_transform(PandaNode *node) {
  */
 bool CharacterJoint::
 has_local_transform(PandaNode *node) const {
+  LightMutexHolder holder(_transform_nodes_lock);
   return (_local_transform_nodes.count(node) > 0);
 }
 
@@ -328,6 +342,7 @@ has_local_transform(PandaNode *node) const {
  */
 void CharacterJoint::
 clear_local_transforms() {
+  LightMutexHolder holder(_transform_nodes_lock);
   NodeList::iterator ai;
   for (ai = _local_transform_nodes.begin();
        ai != _local_transform_nodes.end();
