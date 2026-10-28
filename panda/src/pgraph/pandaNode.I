@@ -611,11 +611,21 @@ get_user_bounds(int pipeline_stage, Thread *current_thread) const {
 INLINE void PandaNode::
 mark_bounds_stale(int pipeline_stage, Thread *current_thread) const {
   // We check whether it is already marked stale.  If so, we don't have to
-  // make the call to force_bounds_stale().
+  // make the call to force_bounds_stale(), because the parents were marked
+  // when this node went stale.  We still advance _next_update, though: a node
+  // that is stale may be in the middle of update_cached() on another thread,
+  // which read its inputs before this change, and the advanced counter is how
+  // that refresh learns not to call the node fresh.  Done under the node's
+  // own lock, which update_cached() holds while it commits, so the mark lands
+  // either before that commit (and is seen) or after it (and finds the node
+  // fresh, and walks up).
   bool is_stale_bounds;
   {
-    CDStageReader cdata(_cycler, pipeline_stage, current_thread);
+    CDStageWriter cdata(((PandaNode *)this)->_cycler, pipeline_stage, current_thread);
     is_stale_bounds = (cdata->_last_update != cdata->_next_update);
+    if (is_stale_bounds) {
+      ++cdata->_next_update;
+    }
   }
   // It's important that we don't hold the lock during the call to
   // force_bounds_stale().
@@ -1315,8 +1325,11 @@ compose_draw_mask(DrawMask &running_draw_mask) const {
  */
 INLINE bool PandaNodePipelineReader::
 compare_draw_mask(DrawMask running_draw_mask, DrawMask camera_mask) const {
+  // check_cached() has computed the masks, but the node need not be fresh
+  // now: another thread working on this stage may have marked it again since,
+  // and the masks are still the ones to traverse with this time.  See
+  // check_cached().
   nassertr(_cdata != nullptr, false);
-  nassertr(_cdata->_last_update == _cdata->_next_update, false);
 
   // As a special case, if net_draw_show_mask is all 0, it means either that
   // all nodes under this node are hidden to all cameras, or that none of them
@@ -1554,7 +1567,8 @@ get_into_collide_mask() const {
  */
 INLINE CollideMask PandaNodePipelineReader::
 get_net_collide_mask() const {
-  nassertr(_cdata->_last_update == _cdata->_next_update, _cdata->_net_collide_mask);
+  // Computed by check_cached(), and possibly marked stale again since; see
+  // compare_draw_mask().
   return _cdata->_net_collide_mask;
 }
 
@@ -1564,7 +1578,8 @@ get_net_collide_mask() const {
  */
 INLINE const RenderAttrib *PandaNodePipelineReader::
 get_off_clip_planes() const {
-  nassertr(_cdata->_last_update == _cdata->_next_update, _cdata->_off_clip_planes);
+  // Computed by check_cached(), and possibly marked stale again since; see
+  // compare_draw_mask().
   return _cdata->_off_clip_planes;
 }
 
@@ -1575,7 +1590,9 @@ get_off_clip_planes() const {
  */
 INLINE const BoundingVolume *PandaNodePipelineReader::
 get_bounds() const {
-  nassertr(_cdata->_last_bounds_update == _cdata->_next_update, _cdata->_external_bounds);
+  // Computed by check_cached(true), and possibly marked stale again since;
+  // see compare_draw_mask().
+  nassertr(_cdata->_external_bounds != nullptr, _cdata->_external_bounds);
   return _cdata->_external_bounds;
 }
 
@@ -1590,7 +1607,8 @@ get_bounds() const {
  */
 INLINE int PandaNodePipelineReader::
 get_nested_vertices() const {
-  nassertr(_cdata->_last_bounds_update == _cdata->_next_update, _cdata->_nested_vertices);
+  // Computed by check_cached(true), and possibly marked stale again since;
+  // see compare_draw_mask().
   return _cdata->_nested_vertices;
 }
 
