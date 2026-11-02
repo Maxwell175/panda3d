@@ -35,7 +35,8 @@ enter(EpochParticipant &p) {
 /**
  * Leaves the critical section entered by enter().  On the outermost leave,
  * drains a batch if the retire backlog has grown past the throttle, bounding
- * in-frame growth. We have separate unbounded drains run at frame/tick boundaries.
+ * in-frame growth. We have separate unbounded drains run at frame/tick boundaries;
+ * one asked for inside this critical section runs here instead.
  */
 ALWAYS_INLINE void EpochManager::
 leave(EpochParticipant &p) {
@@ -45,7 +46,9 @@ leave(EpochParticipant &p) {
     if (p.retire_pending != 0) {
       flush_retired(p);
     }
-    if (_retired_count.load(std::memory_order_relaxed) >= checkpoint_threshold) {
+    if (p.reclaim_on_leave) {
+      reclaim_deferred(p);
+    } else if (_retired_count.load(std::memory_order_relaxed) >= checkpoint_threshold) {
       try_advance_epoch();
       try_reclaim(256);
     }

@@ -52,8 +52,13 @@ struct EpochParticipant {
   uint32_t retire_pending = 0;
   bool registered = false;
   bool online = false;
+  // A full drain was asked for inside a critical section; the outermost
+  // leave() runs it (see reclaim_when_quiescent).  Fits the padding.
+  bool reclaim_on_leave = false;
   ~EpochParticipant();
 };
+static_assert(sizeof(EpochParticipant) <= 32,
+              "EpochParticipant is a member of Thread and must stay within 32 bytes");
 #else  // CPPPARSER
 struct EpochParticipant {};
 #endif  // CPPPARSER
@@ -73,6 +78,7 @@ public:
   static void note_retired(size_t n);
   static void try_advance_epoch();
   static size_t try_reclaim(size_t budget = ~size_t(0));
+  static void reclaim_when_quiescent(EpochParticipant &p);
   static void consider_reclaim(EpochParticipant &p);
 
   static void register_thread(Thread *t, int stage);
@@ -98,6 +104,8 @@ private:
 
   static void stage_occupancy_inc(int stage);
   static void stage_occupancy_dec(int stage);
+
+  static void reclaim_deferred(EpochParticipant &p);
 
   static patomic<uint64_t> _global_epoch;  // 0 reserved for "quiescent"
 

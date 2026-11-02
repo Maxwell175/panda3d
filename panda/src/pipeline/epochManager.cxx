@@ -18,6 +18,7 @@
 #include "pmutex.h"
 #include "mutexHolder.h"
 #include "pdeque.h"
+#include "config_pipeline.h"
 
 #include <algorithm>
 
@@ -292,6 +293,42 @@ try_reclaim(size_t budget) {
   }
   tl_in_reclaim = prev_in_reclaim;
   return to_free.size();
+}
+
+/**
+ * Frees everything reclaimable.  If the calling thread is inside a critical
+ * section, frees at most pipeline-frame-reclaim-limit entries now and leaves
+ * the rest for when it leaves its outermost critical section.
+ *
+ * A drain run inside a critical section is held to the caller's own slot.  It
+ * can free only what was retired before the caller entered, the global epoch
+ * cannot advance past that slot while it runs, and so nothing any other thread
+ * retires meanwhile can be freed by anyone until the caller leaves.  Unbounded,
+ * threads that keep writing hand the next drain a backlog as long as this one
+ * took, and once they retire faster than one thread frees, every drain is
+ * longer than the one before it.  Must use this thread's own participant.
+ */
+void EpochManager::
+reclaim_when_quiescent(EpochParticipant &p) {
+  if (p.depth == 0) {
+    try_reclaim();
+    return;
+  }
+  size_t limit = (size_t)std::max(pipeline_frame_reclaim_limit.get_value(), 0);
+  if (try_reclaim(limit) == limit) {
+    p.reclaim_on_leave = true;
+  }
+}
+
+/**
+ * The drain reclaim_when_quiescent() deferred, run by leave() once this
+ * thread's slot has been cleared.
+ */
+void EpochManager::
+reclaim_deferred(EpochParticipant &p) {
+  p.reclaim_on_leave = false;
+  try_advance_epoch();
+  try_reclaim();
 }
 
 /**

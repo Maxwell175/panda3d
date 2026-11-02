@@ -21,7 +21,13 @@ add_test(NAME ebr_cycler_read_your_writes
 add_test(NAME ebr_cycler_gc_lifetime
   COMMAND ebr_cycler --gc-lifetime
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
-set_tests_properties(ebr_cycler_read_your_writes ebr_cycler_gc_lifetime PROPERTIES
+# A frame's drain frees only a bounded part inside the frame's critical section,
+# so it never holds the reclaim floor for long, and the rest once that ends.
+add_test(NAME ebr_cycler_quiescent_reclaim
+  COMMAND ebr_cycler --quiescent-reclaim
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+set_tests_properties(ebr_cycler_read_your_writes ebr_cycler_gc_lifetime
+  ebr_cycler_quiescent_reclaim PROPERTIES
   LABELS "ebr_cycler"
   TIMEOUT 30
   ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib")

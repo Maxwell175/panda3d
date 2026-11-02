@@ -74,6 +74,16 @@ ConfigVariableBool pipeline_upstream_propagate
           "say -- is discarded by the next Pipeline::cycle(), which copies "
           "stage i-1 over stage i.  Provided mainly to A/B the behaviour."));
 
+ConfigVariableInt pipeline_frame_reclaim_limit
+("pipeline-frame-reclaim-limit", 262144,
+ PRC_DESC("The most retired CycleData the end of Pipeline::cycle() frees while "
+          "its caller is still inside a critical section, as render_frame() "
+          "always is.  While that drain runs no other thread can free "
+          "anything, so it is kept short; the rest is freed when the caller "
+          "leaves its outermost critical section.  The default is well above "
+          "what an animated scene retires in a frame, so the drain normally "
+          "finishes in place, while the render threads are idle."));
+
 /**
  * Initializes the library.  This must be called at least once before any of
  * the functions or classes in this library can be used.  Normally it will be

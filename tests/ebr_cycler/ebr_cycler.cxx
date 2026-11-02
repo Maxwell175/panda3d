@@ -26,6 +26,7 @@
 #include "epochManager.h"
 #include "epochHolder.h"
 #include "pandaNode.h"
+#include "pipeline.h"
 #include "trueClock.h"
 
 #include <atomic>
@@ -226,6 +227,92 @@ static int run_gc_lifetime() {
   return leaked;
 }
 
+// A CycleData that knows whether it was made before the frame under test, and
+// counts how many of those were freed while the frame was still running.
+class FrameCData : public CycleData {
+public:
+  FrameCData() : _before(!_in_frame) { if (_before) ++_alive_before; }
+  FrameCData(const FrameCData &copy) : CycleData(copy), _v(copy._v), _before(!_in_frame) {
+    if (_before) ++_alive_before;
+  }
+  ~FrameCData() {
+    if (_before) --_alive_before;
+    if (_before && _in_frame) ++_freed_in_frame;
+  }
+  CycleData *make_copy() const override { return new FrameCData(*this); }
+  TypeHandle get_parent_type() const override { return TypedReferenceCount::get_class_type(); }
+
+  uint64_t _v = 0;
+  bool _before;
+  static bool _in_frame;
+  static int _alive_before;
+  static int _freed_in_frame;
+};
+bool FrameCData::_in_frame = false;
+int FrameCData::_alive_before = 0;
+int FrameCData::_freed_in_frame = 0;
+
+// A frame's drain may free only a bounded part of the backlog inside the
+// frame's critical section, and the rest once that ends.  render_frame() holds
+// its thread in a critical section around Pipeline::cycle(), and a drain run
+// there is held to that thread's own slot: the global epoch cannot pass it, so
+// nothing any other thread retires while the drain runs can be freed by anyone
+// until it returns.  Unbounded, those threads leave a backlog as long as the
+// drain for the next frame's, and once they retire faster than one thread
+// frees, each frame's drain is longer than the last.  The backlog must still
+// be gone once the frame ends.
+static int run_quiescent_reclaim() {
+  const int limit = 1000;
+  load_prc_file_data("qr", "pipeline-always-cow true\n"
+                           "pipeline-frame-reclaim-limit 1000\n");
+  Thread *th = Thread::get_current_thread();
+  Pipeline *pipeline = Pipeline::get_render_pipeline();
+  pipeline->set_num_stages(2);
+  int failures = 0;
+
+  PipelineCycler<FrameCData> cycler;
+  const int writes = 4096;
+  {
+    EpochHolder epoch(th);
+    for (int i = 0; i < writes; ++i) {
+      CycleDataWriter<FrameCData> cdw(cycler, th);
+      cdw->_v = (uint64_t)i;
+    }
+  }
+  // Move the epoch on, so the backlog is older than the frame and a drain
+  // anywhere in the frame is entitled to free it.
+  EpochManager::try_advance_epoch();
+  EpochManager::try_advance_epoch();
+  int backlog = FrameCData::_alive_before;
+
+  {
+    EpochHolder frame(th);
+    FrameCData::_in_frame = true;
+    pipeline->cycle();
+    FrameCData::_in_frame = false;
+  }
+
+  // At most one per stage is still the cycler's own.
+  int left = FrameCData::_alive_before;
+  std::fprintf(stderr,
+               "[quiescent-reclaim] backlog=%d freed_in_frame=%d left_after_frame=%d\n",
+               backlog, FrameCData::_freed_in_frame, left);
+  if (backlog < 2 * limit) {
+    std::fprintf(stderr, "FAIL no backlog to drain\n");
+    ++failures;
+  }
+  if (FrameCData::_freed_in_frame > limit) {
+    std::fprintf(stderr, "FAIL freed more than %d inside the frame's critical section\n", limit);
+    ++failures;
+  }
+  if (left > pipeline->get_num_stages()) {
+    std::fprintf(stderr, "FAIL backlog not drained once the frame ended\n");
+    ++failures;
+  }
+  std::fprintf(stderr, "%s\n", failures == 0 ? "PASS" : "FAIL");
+  return failures == 0 ? 0 : 1;
+}
+
 static std::atomic<int> g_assert_fires{0};
 // Counts guardrail trips without ever aborting: once any handler is installed,
 // Notify::assert_failure returns through it and skips the default print +
@@ -309,6 +396,9 @@ int main(int argc, char **argv) {
     }
     else if (std::strcmp(argv[i], "--guardrail") == 0) {
       std::_Exit(run_guardrail());
+    }
+    else if (std::strcmp(argv[i], "--quiescent-reclaim") == 0) {
+      std::_Exit(run_quiescent_reclaim());
     }
     else seconds = std::atoi(argv[i]);
   }

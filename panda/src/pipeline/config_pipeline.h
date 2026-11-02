@@ -29,6 +29,7 @@ extern ConfigVariableBool name_deleted_mutexes;
 extern ConfigVariableInt thread_stack_size;
 extern EXPCL_PANDA_PIPELINE ConfigVariableBool pipeline_always_cow;
 extern EXPCL_PANDA_PIPELINE ConfigVariableBool pipeline_upstream_propagate;
+extern EXPCL_PANDA_PIPELINE ConfigVariableInt pipeline_frame_reclaim_limit;
 
 extern EXPCL_PANDA_PIPELINE void init_libpipeline();
 

@@ -269,8 +269,9 @@ cycle() {
   }
 
   // Fully drain the reclaimable EBR backlog once per cycle so the retire queue
-  // stays bounded.
-  EpochManager::try_reclaim();
+  // stays bounded.  render_frame() calls this inside its own critical section,
+  // so only a bounded part runs here; see reclaim_when_quiescent().
+  EpochManager::reclaim_when_quiescent(Thread::get_current_thread()->epoch_participant());
 
   if (pipeline_cat.is_debug()) {
     pipeline_cat.debug()
