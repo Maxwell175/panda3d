@@ -38,6 +38,7 @@ namespace {
 }
 
 Create_AudioManager_proc *AudioManager::_create_AudioManager = nullptr;
+const char *AudioManager::_create_AudioManager_library = nullptr;
 
 void AudioManager::
 register_AudioManager_creator(Create_AudioManager_proc* proc) {
@@ -45,9 +46,40 @@ register_AudioManager_creator(Create_AudioManager_proc* proc) {
   _create_AudioManager = proc;
 }
 
+/**
+ * As above, and also names the audio library the creator belongs to, as
+ * audio-library-name names it.  A static build uses the name to tell whether
+ * a configured audio-library-name asks for the module that was linked in.
+ */
+void AudioManager::
+register_AudioManager_creator(Create_AudioManager_proc* proc,
+                              const char *library_name) {
+  nassertv(_create_AudioManager == nullptr || _create_AudioManager == proc);
+  _create_AudioManager = proc;
+  _create_AudioManager_library = library_name;
+}
+
 // Factory method for getting a platform specific AudioManager:
 PT(AudioManager) AudioManager::create_AudioManager() {
   audio_debug("create_AudioManager()\n  audio_library_name=\""<<audio_library_name<<"\"");
+
+#ifdef LINK_ALL_STATIC
+  // An audio module linked into a static build registers its creator from its
+  // static initializer, before any configuration has been read.  That makes it
+  // the default, not a choice: an audio-library-name that is set and names
+  // something else, "null" included, is still honored.
+  static bool linked_checked = false;
+  if (!linked_checked) {
+    linked_checked = true;
+    if (_create_AudioManager_library != nullptr &&
+        audio_library_name.has_value() &&
+        audio_library_name.get_value() != _create_AudioManager_library) {
+      audio_debug("  not using the linked " << _create_AudioManager_library);
+      _create_AudioManager = nullptr;
+      _create_AudioManager_library = nullptr;
+    }
+  }
+#endif
 
   if (_create_AudioManager != nullptr) {
     // Someone was already so good as to register an audio manager creation function,

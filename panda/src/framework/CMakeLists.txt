@@ -38,6 +38,12 @@ if(NOT BUILD_SHARED_LIBS)
     list(APPEND P3FRAMEWORK_LINK_TARGETS pandaegg)
   endif()
 
+  # And the OpenAL audio module, for the same reason as the renderers: there is
+  # no plugin to load, so the framework's static init registers it instead.
+  if(HAVE_AUDIO AND HAVE_OPENAL)
+    list(APPEND P3FRAMEWORK_LINK_TARGETS p3openal_audio)
+  endif()
+
 endif()
 
 composite_sources(p3framework P3FRAMEWORK_SOURCES)
@@ -51,6 +57,7 @@ foreach(var
     HAVE_TINYDISPLAY
     HAVE_DX9
     HAVE_EGG
+    HAVE_OPENAL
 )
 
   if(${var})

@@ -105,6 +105,10 @@
     <LinkerArg Include="winmm.lib" />
     <LinkerArg Include="ws2_32.lib" />
     <LinkerArg Include="crypt32.lib" />
+    <!-- p3framework_static_init() links the OpenAL module, and with it OpenAL's WASAPI backend,
+         which imports AvSetMmThreadCharacteristicsW and AvRevertMmThreadCharacteristics. The
+         toolchain's own list has ole32 for the COM calls beside them, but not avrt. -->
+    <LinkerArg Include="avrt.lib" />
   </ItemGroup>
 
   <!-- Strip static archives from build output — they are link-time only. -->

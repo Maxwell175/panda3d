@@ -178,6 +178,8 @@ PUBLISHED:
 
 public:
   static void register_AudioManager_creator(Create_AudioManager_proc* proc);
+  static void register_AudioManager_creator(Create_AudioManager_proc* proc,
+                                            const char *library_name);
 
 protected:
   friend class AudioSound;
@@ -187,6 +189,7 @@ protected:
   // flexibility.
 
   static Create_AudioManager_proc* _create_AudioManager;
+  static const char *_create_AudioManager_library;
   patomic<AudioSound *> _null_sound;
 
   AudioManager();

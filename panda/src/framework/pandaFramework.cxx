@@ -53,6 +53,9 @@ extern EXPCL_PANDA_CHAR void init_libchar();
 #ifdef HAVE_EGG
 extern void init_libpandaegg();
 #endif
+#if defined(HAVE_AUDIO) && defined(HAVE_OPENAL)
+extern "C" void init_libOpenALAudio();
+#endif
 #endif
 
 extern "C" EXPCL_FRAMEWORK void
@@ -74,6 +77,12 @@ p3framework_static_init() {
   init_libchar();
 #ifdef HAVE_EGG
   init_libpandaegg();
+#endif
+#if defined(HAVE_AUDIO) && defined(HAVE_OPENAL)
+  // A static build has no audio plugin to load: nothing else references the
+  // OpenAL module, so without this its initializer is never linked in, no
+  // AudioManager creator is registered, and every manager comes back null.
+  init_libOpenALAudio();
 #endif
 #endif
 

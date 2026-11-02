@@ -69,7 +69,8 @@ init_libOpenALAudio() {
   OpenALAudioManager::init_type();
   OpenALAudioSound::init_type();
 
-  AudioManager::register_AudioManager_creator(&Create_OpenALAudioManager);
+  AudioManager::register_AudioManager_creator(&Create_OpenALAudioManager,
+                                              "p3openal_audio");
 
   PandaSystem *ps = PandaSystem::get_global_ptr();
   ps->add_system("OpenAL");
