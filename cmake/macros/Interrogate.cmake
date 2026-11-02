@@ -309,12 +309,24 @@ set_property(GLOBAL PROPERTY INTERROGATE_CSHARP_MODULE_DEPENDS "")
 # owns a shared collection, and emit or reference different classes for it.
 # file(GENERATE) runs after the whole project is configured, so this file always
 # holds every module.  It lands under the pass-2 --search-dir, which is scanned
-# recursively for the .in and .csharpcoll sidecars this joins.
+# recursively for the .in and .csharpcoll sidecars this joins.  Its path is kept
+# in a variable so that the file(GENERATE) below and every pass-2 rule that
+# depends on it name one path.
+set(CSHARP_MODMAP_FILE "${CMAKE_BINARY_DIR}/cmake/panda3d.csharpmods")
 add_library(p3csharp_modmap INTERFACE)
 set_property(TARGET p3csharp_modmap PROPERTY CSHARP_MODMAP_LINES "")
 file(GENERATE
-  OUTPUT "${CMAKE_BINARY_DIR}/cmake/panda3d.csharpmods"
+  OUTPUT "${CSHARP_MODMAP_FILE}"
   CONTENT "$<JOIN:$<TARGET_PROPERTY:p3csharp_modmap,CSHARP_MODMAP_LINES>,\n>\n")
+
+# Every file a pass 1 writes that pass 2 reads: each library's .in and its
+# .csharpcoll and .csharphelpers sidecars.  Pass 2 loads all of them from the
+# --search-dir, not only its own module's, so what it generates depends on
+# which exist when it runs.  Each pass 2 therefore depends on every one of
+# them.  A module declared early cannot name the libraries declared after it,
+# so the list is kept here and read through a generator expression, which is
+# evaluated once the whole project is configured.
+set_property(TARGET p3csharp_modmap PROPERTY CSHARP_PASS1_OUTPUTS "")
 
 # Internal: invoke interrogate_csharp (pass 2) to emit .cs files for one module.
 function(_interrogate_csharp_pass2 module stamp dllname module_databases)
@@ -349,10 +361,14 @@ function(_interrogate_csharp_pass2 module stamp dllname module_databases)
     list(APPEND _library_flags "--library" "${_lib_name}")
   endforeach()
 
+  # Pass 2 starts from an empty output directory.  interrogate_csharp skips a
+  # file that is already there, so a rerun into the last run's output would not
+  # generate what a clean build does.
   add_custom_command(
     OUTPUT "${stamp}"
     JOB_POOL interrogate_csharp_finalize
     COMMAND ${CMAKE_COMMAND} -E make_directory "${stamp_directory}"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${_cs_output_dir}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${_cs_output_dir}"
     COMMAND interrogate_csharp
       --module "${module}"
@@ -365,7 +381,10 @@ function(_interrogate_csharp_pass2 module stamp dllname module_databases)
       ${module_databases}
     COMMAND ${CMAKE_COMMAND} -E touch "${stamp}"
     COMMAND_EXPAND_LISTS
-    DEPENDS ${module_databases}
+    DEPENDS
+      ${module_databases}
+      "$<TARGET_PROPERTY:p3csharp_modmap,CSHARP_PASS1_OUTPUTS>"
+      "${CSHARP_MODMAP_FILE}"
     COMMENT "Generating final C# bindings for ${module}")
 endfunction()
 
@@ -488,10 +507,22 @@ function(add_csharp_module module)
   set(_stamp "${CSHARP_OUTPUT_DIR}/${module}.csharp.stamp")
   _interrogate_csharp_pass2("${module}" "${_stamp}" "${dllname}" "${infiles_abs}")
 
+  # Pass 1 for this module's libraries, as a target of its own, and every
+  # module's pass 1 under csharp_pass1.  Pass 2 depends on files that other
+  # directories' rules write, which only Ninja can order by the files alone;
+  # under Makefiles a rule in another directory is not run for them, so pass 2
+  # waits for all of pass 1 at the target level as well.
+  if(NOT TARGET csharp_pass1)
+    add_custom_target(csharp_pass1)
+  endif()
+  add_custom_target(${module}_csharp_pass1 DEPENDS ${infiles_abs} ${sources_abs})
+  add_dependencies(csharp_pass1 ${module}_csharp_pass1)
+
   if(NOT TARGET csharp_bindings)
     add_custom_target(csharp_bindings)
   endif()
   add_custom_target(${module}_csharp_igate DEPENDS ${infiles_abs} ${sources_abs} ${_stamp})
+  add_dependencies(${module}_csharp_igate csharp_pass1)
   add_dependencies(csharp_bindings ${module}_csharp_igate)
 
   if(link_targets AND sources_abs)
@@ -593,13 +624,18 @@ function(interrogate_csharp_native_sources target output database language_flags
 
   get_filename_component(output_directory "${output}" DIRECTORY)
   get_filename_component(database_directory "${database}" DIRECTORY)
-  # interrogate writes a .csharpcoll sidecar next to the .in (the collections
-  # this library defines); pass 2 reads them all to pick each collection's owner.
-  string(REGEX REPLACE "\\.in$" ".csharpcoll" _sidecar "${database}")
+  # interrogate writes two sidecars next to the .in: a .csharpcoll (the
+  # collections this library defines), which pass 2 reads to pick each
+  # collection's owner, and a .csharphelpers (the types it emits the per-type
+  # helpers for), which pass 2 reads to name the helper it binds.  Both are
+  # written on every run, so they are outputs like the .in.
+  string(REGEX REPLACE "\\.in$" ".csharpcoll" _collections "${database}")
+  string(REGEX REPLACE "\\.in$" ".csharphelpers" _helpers "${database}")
+  set_property(TARGET p3csharp_modmap APPEND PROPERTY
+    CSHARP_PASS1_OUTPUTS "${database}" "${_collections}" "${_helpers}")
 
   add_custom_command(
-    OUTPUT "${output}" "${database}"
-    BYPRODUCTS "${_sidecar}"
+    OUTPUT "${output}" "${database}" "${_collections}" "${_helpers}"
     JOB_POOL interrogate_csharp_finalize
     COMMAND ${CMAKE_COMMAND} -E make_directory "${output_directory}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${database_directory}"
