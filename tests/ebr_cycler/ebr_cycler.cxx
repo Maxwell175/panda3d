@@ -375,6 +375,48 @@ static int run_guardrail() {
 #endif
 }
 
+// A thread can retire after its own retire buffer has been destroyed: exit()
+// destroys the main thread's thread_locals before the static destructors run,
+// and a static node destroyed then retires its CycleData.  Here a thread_local
+// first touched before the buffer is destroyed after it, and retires from its
+// destructor.  That pointer must still reach the shared queue rather than be
+// written into the buffer's freed storage.
+namespace {
+  struct LateRetire {
+    CycleData *cd = nullptr;
+    ~LateRetire() {
+      if (cd != nullptr) {
+        EpochManager::retire(cd);
+      }
+    }
+  };
+}
+static thread_local LateRetire tl_late_retire;
+
+static int run_retire_after_teardown() {
+  size_t before = EpochManager::get_retired_count();
+  PT(Thread) th;
+  std::thread([&] {
+    th = Thread::bind_thread("late_retire", "late_retire");
+    // Touched first, so destroyed after the retire buffer below.
+    CycleData *late = new TestCData;
+    late->node_ref();
+    tl_late_retire.cd = late;
+    // Retiring through the buffer creates it.
+    CycleData *early = new TestCData;
+    early->node_ref();
+    EpochManager::retire(early);
+  }).join();
+  size_t queued = EpochManager::get_retired_count() - before;
+
+  // The early pointer is flushed by the buffer's destructor, the late one by
+  // the hand-over after it.
+  bool ok = (queued == 2);
+  std::fprintf(stderr, "[retire-after-teardown] queued=%zu (expect 2)\n%s\n",
+               queued, ok ? "PASS" : "FAIL");
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   load_prc_file_data("test_ebr_cycler",
       "notify-level fatal\n"
@@ -399,6 +441,9 @@ int main(int argc, char **argv) {
     }
     else if (std::strcmp(argv[i], "--quiescent-reclaim") == 0) {
       std::_Exit(run_quiescent_reclaim());
+    }
+    else if (std::strcmp(argv[i], "--retire-after-teardown") == 0) {
+      std::_Exit(run_retire_after_teardown());
     }
     else seconds = std::atoi(argv[i]);
   }

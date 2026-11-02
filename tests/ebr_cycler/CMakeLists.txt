@@ -26,8 +26,13 @@ add_test(NAME ebr_cycler_gc_lifetime
 add_test(NAME ebr_cycler_quiescent_reclaim
   COMMAND ebr_cycler --quiescent-reclaim
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+# A retire made after the thread's own retire buffer is destroyed, as the
+# static destructors exit() runs do on the main thread, still reaches the queue.
+add_test(NAME ebr_cycler_retire_after_teardown
+  COMMAND ebr_cycler --retire-after-teardown
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 set_tests_properties(ebr_cycler_read_your_writes ebr_cycler_gc_lifetime
-  ebr_cycler_quiescent_reclaim PROPERTIES
+  ebr_cycler_quiescent_reclaim ebr_cycler_retire_after_teardown PROPERTIES
   LABELS "ebr_cycler"
   TIMEOUT 30
   ENVIRONMENT "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib")

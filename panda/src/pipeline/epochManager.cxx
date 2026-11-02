@@ -47,6 +47,14 @@ namespace {
 
 static thread_local bool tl_in_reclaim = false;
 
+// Set once this thread's buffer below has been destroyed.  A thread can still
+// retire after that: exit() destroys the main thread's thread_locals before it
+// runs the static destructors, and a static node destroyed then retires its
+// CycleData.  Pushed into the destroyed buffer, each pointer was written into
+// freed memory, over the allocator's own free list.  Trivially destructible, so
+// it stays readable for the rest of the thread's life.
+static thread_local bool tl_retire_gone = false;
+
 // Declared ahead of the buffer so the buffer's destructor can call it.
 static void flush_retire_buf();
 
@@ -57,7 +65,10 @@ static void flush_retire_buf();
 namespace {
   struct RetireBuf {
     pvector<CycleData *> v;
-    ~RetireBuf() { flush_retire_buf(); }
+    ~RetireBuf() {
+      flush_retire_buf();
+      tl_retire_gone = true;
+    }
   };
 }
 static thread_local RetireBuf tl_retire;
@@ -162,6 +173,18 @@ retire(CycleData *cd) {
     return;
   }
 
+  if (tl_retire_gone) {
+    // This thread's buffer is gone (see tl_retire_gone): hand the pointer
+    // straight over.
+    EbrRegistry *r = get_registry();
+    {
+      MutexHolder hold(r->retired_lock);
+      r->retired.push_back({get_global_epoch(), cd});
+    }
+    note_retired(1);
+    return;
+  }
+
   // Buffer locally and hand the batch over when it fills.  Taking the shared
   // lock per pointer serializes every copy-on-write in the process, which an
   // animating scene does tens of thousands of times a frame.
@@ -178,7 +201,7 @@ retire(CycleData *cd) {
  * entry later in the queue, delaying its free, never advancing it.
  */
 static void flush_retire_buf() {
-  if (tl_retire.v.empty()) {
+  if (tl_retire_gone || tl_retire.v.empty()) {
     return;
   }
   size_t n = tl_retire.v.size();
